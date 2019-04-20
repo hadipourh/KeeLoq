@@ -4,7 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-#define number_of_encryptions 1000000
+#define NUMBER_OF_ENCRYPTIONS 1000000
 
 double speed(int r);
 
