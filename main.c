@@ -22,10 +22,10 @@ int main()
     using 'polynomials' function, to genrate poolynomial
     equations of KeeLoq over GF(2), for a given number of rounds:
     */
-    printf("%s\n%s", "Enter the number of rounds",
+    printf("\n%s\n%s", "Enter the number of rounds,",
            "this time to generate polynomial equations: ");
     scanf("%d", &r);
-    printf("%s\n%s", "Enter an integer bigger than 1",
+    printf("\n%s\n%s", "Enter an integer bigger than 1,",
            "as the number of known plaintexts to generate polynomial equations: ");
     scanf("%d", &number_of_plaintexts);
     time_t t;
@@ -48,6 +48,7 @@ int main()
     {
         printf("%s\n", output.eqs[i].eq);
     }
+    free(output.eqs);
     free(ps);
     free(cs);
     // Using speed method:
