@@ -20,10 +20,10 @@ output_of_polynomials polynomials(uint32_t *plains, uint32_t *ciphers, int r, in
         for (j = 32; j < r + 32; j++)
         {
             sprintf(buffer, EQ2,
-                    i, j, i, (j - 32) % 64, i, (j - 32), i, (j - 16), i, (j - 23),
-                    i, (j - 30), i, (j - 1), i, (j - 12), i, j, i, (j - 6), i,
-                    (j - 12), i, (j - 6), i, (j - 30), i, (j - 12), i, (j - 23),
-                    i, (j - 23), i, (j - 30), i, j, i, (j - 23), i, j, i, (j - 12),
+                    i, j, (j - 32) % 64, i, (j - 32), i, (j - 16), i, (j - 23),
+                    i, (j - 31), i, (j - 1), i, (j - 12), i, j, i, (j - 6), i,
+                    (j - 12), i, (j - 6), i, (j - 31), i, (j - 12), i, (j - 23),
+                    i, (j - 23), i, (j - 31), i, j, i, (j - 23), i, j, i, (j - 12),
                     i, j, i, (j - 23), i, j, i, (j - 12));
             output.eqs[eqs_ctr].eq = (char *)malloc(sizeof(buffer));
             strcpy(output.eqs[eqs_ctr].eq, buffer);
@@ -32,14 +32,14 @@ output_of_polynomials polynomials(uint32_t *plains, uint32_t *ciphers, int r, in
             output.eqs[eqs_ctr].eq = (char *)malloc(sizeof(buffer));
             strcpy(output.eqs[eqs_ctr].eq, buffer);
             eqs_ctr++;
-            sprintf(buffer, EQ4, i, j, i, (j - 1), i, (j - 30));
+            sprintf(buffer, EQ4, i, j, i, (j - 1), i, (j - 31));
             output.eqs[eqs_ctr].eq = (char *)malloc(sizeof(buffer));
             strcpy(output.eqs[eqs_ctr].eq, buffer);
             eqs_ctr++;
         }
         for (j = r; j < r + 32; j++)
         {
-            sprintf(buffer, EQ1, i, j, ((ciphers[i] >> j) & 0x1));
+            sprintf(buffer, EQ1, i, j, ((ciphers[i] >> (j - r)) & 0x1));
             output.eqs[eqs_ctr].eq = (char *)malloc(sizeof(buffer));
             strcpy(output.eqs[eqs_ctr].eq, buffer);
             eqs_ctr++;
