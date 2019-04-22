@@ -44,9 +44,13 @@ int main()
     }
     output_of_polynomials output;
     output = polynomials(ps, cs, r, number_of_plaintexts);
-    for (size_t i = 0; i < output.number_of_eqs; i++)
+    for (i = 0; i < output.number_of_eqs; i++)
     {
         printf("%s\n", output.eqs[i].eq);
+    }
+    for (i = 0; i < output.number_of_eqs; i++)
+    {
+        free(output.eqs[i].eq);
     }
     free(output.eqs);
     free(ps);
