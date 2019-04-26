@@ -10,14 +10,19 @@ int main()
     uint32_t p = 0xf741e2db;
     uint32_t c;
     int r = 40;
+    int i;
     int number_of_plaintexts = 1;
     printf("Enter the number of rounds: ");
     scanf("%d", &r);
     printf("plaintext before encryption\t: %x\n", p);
-    c = keeloq_encrypt(k, p, r);
+    keeloq_encrypt(&k, &p, &c, r);
     printf("ciphertext\t: %x\n", c);
-    p = keeloq_decrypt(k, c, r);
+    keeloq_decrypt(&k, &p, &c, r);
     printf("plaintext after decryption\t: %x\n", p);
+    // Using speed method:
+    // double cpu_time;
+    // cpu_time = speed(r);
+    // printf("speed of %d rounds of encryption\t: %f (mega byte/second)\n", r, cpu_time);
     /*
     using 'polynomials' function, to genrate poolynomial
     equations of KeeLoq over GF(2), for a given number of rounds:
@@ -25,14 +30,13 @@ int main()
     printf("\n%s\n%s", "Enter the number of rounds,",
            "this time to generate polynomial equations: ");
     scanf("%d", &r);
-    printf("\n%s\n%s", "Enter an integer bigger than 1,",
+    printf("\n%s\n%s", "Enter an integer bigger than 0,",
            "as the number of known plaintexts to generate polynomial equations: ");
     scanf("%d", &number_of_plaintexts);
-    time_t t;
     uint32_t *ps = (uint32_t *)malloc(number_of_plaintexts * sizeof(uint32_t));
     uint32_t *cs = (uint32_t *)malloc(number_of_plaintexts * sizeof(uint32_t));
-    int i;
     // Intializes random number generator
+    time_t t;
     srand((unsigned)time(&t));
     for (i = 0; i < number_of_plaintexts; i++)
     {
@@ -40,25 +44,16 @@ int main()
     }
     for (i = 0; i < number_of_plaintexts; i++)
     {
-        cs[i] = keeloq_encrypt(k, ps[i], r);
+        keeloq_encrypt(&k, ps + i, cs + i, r);
     }
-    output_of_polynomials output;
-    output = polynomials(ps, cs, r, number_of_plaintexts);
-    for (i = 0; i < output.number_of_eqs; i++)
-    {
-        printf("%s\n", output.eqs[i].eq);
-    }
-    for (i = 0; i < output.number_of_eqs; i++)
-    {
-        free(output.eqs[i].eq);
-    }
-    free(output.eqs);
+    polyequations equations;
+    equations = polynomials(ps, cs, r, number_of_plaintexts);
     free(ps);
     free(cs);
-    // Using speed method:
-    double cpu_time;
-    cpu_time = speed(r);
-    printf("speed of %d rounds of encryption\t: %f (mega byte/second)\n", r, cpu_time);
+    for (i = 0; i < equations.number_of_eqs; i++)
+    {
+        printf("%s\n", equations.eqs[i].poly);
+    }
     printf("Type Enter to exit\n");
     do
     {
