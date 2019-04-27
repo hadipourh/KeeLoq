@@ -7,8 +7,8 @@ double speed(int r)
     uint64_t key = 0x5cec6701b79fd949;
     uint32_t plaintexts[NUMBER_OF_ENCRYPTIONS];
     uint32_t *ciphertext;
-    time_t t;    
-    ciphertext = (uint32_t*) malloc(NUMBER_OF_ENCRYPTIONS * sizeof(uint32_t));
+    time_t t;
+    ciphertext = (uint32_t *)malloc(NUMBER_OF_ENCRYPTIONS * sizeof(uint32_t));
     int i;
     clock_t start, end;
     double cpu_time_used;
@@ -21,7 +21,7 @@ double speed(int r)
     }
     start = clock();
     for (i = 0; i < NUMBER_OF_ENCRYPTIONS; i++)
-    {        
+    {
         keeloq_encrypt(&key, plaintexts + i, ciphertext + i, r);
     }
     end = clock();

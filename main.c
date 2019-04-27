@@ -19,10 +19,6 @@ int main()
     printf("ciphertext\t: %x\n", c);
     keeloq_decrypt(&k, &p, &c, r);
     printf("plaintext after decryption\t: %x\n", p);
-    // Using speed method:
-    // double cpu_time;
-    // cpu_time = speed(r);
-    // printf("speed of %d rounds of encryption\t: %f (mega byte/second)\n", r, cpu_time);
     /*
     using 'polynomials' function, to genrate poolynomial
     equations of KeeLoq over GF(2), for a given number of rounds:
@@ -46,14 +42,24 @@ int main()
     {
         keeloq_encrypt(&k, ps + i, cs + i, r);
     }
-    polyequations equations;
-    equations = polynomials(ps, cs, r, number_of_plaintexts);
+    polynomial *equations;
+    uint64_t neqs;
+    neqs = calculate_num_of_equations(r, number_of_plaintexts);
+    equations = (polynomial *)malloc(neqs * sizeof(polynomial));
+    polynomials(ps, cs, equations, r, number_of_plaintexts);
     free(ps);
     free(cs);
-    for (i = 0; i < equations.number_of_eqs; i++)
+    for (i = 0; i < neqs; i++)
     {
-        printf("%s\n", equations.eqs[i].poly);
+        printf("%s\n", equations[i].poly);
     }
+    free(equations);
+
+    // Using speed method:
+    double cpu_time;
+    cpu_time = speed(r);
+    printf("speed of %d rounds of encryption\t: %f (mega byte/second)\n", r, cpu_time);
+    
     printf("Type Enter to exit\n");
     do
     {

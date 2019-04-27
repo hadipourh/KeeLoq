@@ -1,13 +1,16 @@
 #include "polygen.h"
 
-polyequations polynomials(uint32_t *plains, uint32_t *ciphers, int r, int number_of_plains)
+uint64_t calculate_num_of_equations(int r, int number_of_plains)
+{
+    uint64_t output;
+    output = number_of_plains * (64 + (r * 3));
+    return output;
+}
+
+void polynomials(uint32_t *plains, uint32_t *ciphers, polynomial *equations, int r, int number_of_plains)
 {
     int i, j;
     uint64_t eqs_ctr = 0;
-    uint64_t number_of_equations;
-    number_of_equations = number_of_plains * (64 + (r * 3));
-    polys equations[number_of_equations];
-    polyequations output;
     for (i = 0; i < number_of_plains; i++)
     {
         for (j = 0; j < 32; j++)
@@ -35,7 +38,4 @@ polyequations polynomials(uint32_t *plains, uint32_t *ciphers, int r, int number
             eqs_ctr++;
         }
     }
-    output.number_of_eqs = eqs_ctr;
-    output.eqs = equations;
-    return output;
 }

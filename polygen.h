@@ -17,13 +17,8 @@
 typedef struct
 {
     char poly[300];
-} polys;
+} polynomial;
 
-typedef struct
-{
-    polys *eqs;
-    uint64_t number_of_eqs;
-} polyequations;
-
-polyequations polynomials(uint32_t *plains, uint32_t *ciphers, int r, int number_of_plains);
+uint64_t calculate_num_of_equations(int r, int number_of_plains);
+void polynomials(uint32_t *plains, uint32_t *ciphers, polynomial *equations, int r, int number_of_plains);
 #endif
