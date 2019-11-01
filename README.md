@@ -15,6 +15,20 @@ KeeLoq decryption algorithm operates on two registers for 528 rounds, to produce
 
 ![KeeLoq encryption algorithm)](./Pictures/KeeLoq-Decryption.svg)
 
+## Building and Usage
+### Building
+```
+git clone https://github.com/hadipourh/KeeLoq
+cd KeeLoq
+make
+```
+### Usage
+Open the terminal within the KeeLoq directory, and then execute the following command:
+
+```
+./main
+```
+
 ## Test Vectors
 
 ```
