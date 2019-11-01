@@ -1,7 +1,9 @@
+# -*- MakeFile -*-
+
 # @H. Hadipour
 # April 19, 2019
 
-# main structure of make file commands: 
+# The main structure of a make file commands is as follows: 
 # target: dependencies
 #       action
 # Example: 
@@ -26,13 +28,13 @@ TARGET = main
 # If you execute make without a flag, it does the actions under the "all" target by default
 all: main.o speed.o polygen.o speed.o keeloq.o
 	$(CC) $(CFLAGS) -o $(TARGET) main.o keeloq.o speed.o polygen.o
-main: main.c
+main.o: main.c keeloq.c keeloq.h polygen.c speed.c
 	$(CC) $(CFLAGS) -c main.c
-speed: speed.c
+speed.o: speed.c speed.h keeloq.h 
 	$(CC) $(CFLAGS) -c speed.c
-polygen: polygen.c
+polygen.o: polygen.c
 	$(CC) $(CFLAGS) -c polygen.c 
-keeloq: keeloq.c
+keeloq.o: keeloq.c keeloq.h
 	$(CC) $(CFLAGS) -c keeloq.c
 clean:
-	rm *.o $(TARGET)
+	rm -f *.o $(TARGET)
