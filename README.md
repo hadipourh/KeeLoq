@@ -1,6 +1,5 @@
 # KeeLoq
-A `C` implementation of KeeLoq. Besides encryption and decryption functions, this implementation contains one function called polynomials,
-to generate polynomial equations of KeeLoq over finite field GF(2).
+An implementation of KeeLoq by C programming language. Besides encryption and decryption functions, this implementation contains one function called polynomials, to generate polynomial equations of KeeLoq over finite field GF(2).
 
 ## What is KeeLoq
 KeeLoq is a proprietary block cipher owned by [Microchip](https://www.microchip.com/), and is used in remote key-less entry systems from several car manufacturers -such as [Chrysler](https://www.chrysler.com/), [Fiat](https://www.fiat.com/), [GM](https://www.gm.com/), [Honda](https://www.honda.com/), [Toyota](https://www.toyota.com/), [Volvo](https://www.volvocars.com/intl), [VW](https://www.vw.com/), [Jaguar](https://www.jaguar.com/index.html), [Iran Khodro](https://www.ikco.ir/en/), etc.- as well as for garage door openers. After the confidential specifications have been leaked on a Russian website [2] in 2006, several cryptanalysts have found substantial weaknesses in the design of the algorithm and the hardware on which it is implemented [1]. 
