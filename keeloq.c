@@ -8,7 +8,7 @@ char nlf(int d)
 void keeloq_encrypt(uint64_t *key, uint32_t *plaintext, uint32_t *ciphertext, int nrounds)
 {    
     *ciphertext = *plaintext;
-    char out, xor, nlf_input;
+    unsigned char out, xor, nlf_input;
     for (int i = 0; i < nrounds; i++)
     {
         nlf_input = (((*ciphertext >> 31) & 0x1) << 4) | (((*ciphertext >> 26) & 0x1) << 3) |
