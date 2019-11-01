@@ -23,14 +23,12 @@ CC = gcc
 CFLAGS  = -g -Wall
 # the build target(s) executable:
 TARGET = main
-all: main.o	
-	$(CC) $(CFLAGS) -c keeloq.c
-	$(CC) $(CFLAGS) -c polygen.c
-	$(CC) $(CFLAGS) -c speed.c
+# If you execute make without a flag, it does the actions under the "all" target by default
+all: main.o speed.o polygen.o speed.o keeloq.o
 	$(CC) $(CFLAGS) -o $(TARGET) main.o keeloq.o speed.o polygen.o
 main: main.c
 	$(CC) $(CFLAGS) -c main.c
-speed: speed.o
+speed: speed.c
 	$(CC) $(CFLAGS) -c speed.c
 polygen: polygen.c
 	$(CC) $(CFLAGS) -c polygen.c 

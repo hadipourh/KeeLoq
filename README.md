@@ -7,13 +7,15 @@ KeeLoq is a proprietary block cipher owned by [Microchip](https://www.microchip.
 
 ## KeeLoq Encryption
 KeeLoq is a block cipher with a 64-bit key and a 32-bit block size. The cipher operates on two registers for 528 clock cycles to produce the ciphertext [1], based on the following shape: 
+
 ![KeeLoq encryption algorithm)](./Pictures/KeeLoq-Encryption.svg)
 
 
 ## KeyLoq Decryption
 KeeLoq decryption algorithm operates on two registers for 528 rounds, to produce the plaintext for a given key and ciphertext, according to the following shape. 
 
-![KeeLoq encryption algorithm)](./Pictures/KeeLoq-Dncryption.svg)
+![KeeLoq encryption algorithm)](./Pictures/KeeLoq-Decryption.svg)
+
 ## Test Vectors
 
 ```

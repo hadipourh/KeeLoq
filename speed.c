@@ -1,3 +1,4 @@
+// Double quotes means that, the included file is in the current directory
 #include "speed.h"
 #include "keeloq.h"
 
