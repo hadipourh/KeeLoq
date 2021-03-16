@@ -27,7 +27,7 @@ int main()
     printf("\n%s\n%s", "Enter the number of rounds,",
            "this time to generate polynomial equations: ");
     scanf("%d", &r);
-    printf("\n%s\n%s", "Enter an integer bigger than 0,",
+    printf("\n%s\n%s", "Enter an integer larger than 0,",
            "as the number of known plaintexts to generate polynomial equations: ");
     scanf("%d", &number_of_plaintexts);
     uint32_t *ps = (uint32_t *)malloc(number_of_plaintexts * sizeof(uint32_t));
