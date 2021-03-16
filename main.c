@@ -56,6 +56,7 @@ int main()
     {
         fprintf(fic, "%s\n", equations[i].poly);
     }
+    fclose(fic);
     free(equations);
     // Using speed method:
     double cpu_time;
