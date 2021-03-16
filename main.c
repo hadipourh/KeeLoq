@@ -13,6 +13,7 @@ int main()
     int r = 40;
     int i;
     int number_of_plaintexts = 1;
+    FILE *fic;
     printf("Enter the number of rounds: ");
     scanf("%d", &r);
     printf("plaintext before encryption\t: %x\n", p);
@@ -50,12 +51,12 @@ int main()
     polynomials(ps, cs, equations, r, number_of_plaintexts);
     free(ps);
     free(cs);
+    fic = fopen("mqkeeloq.txt", "w");
     for (i = 0; i < neqs; i++)
     {
-        printf("%s\n", equations[i].poly);
+        fprintf(fic, "%s\n", equations[i].poly);
     }
     free(equations);
-
     // Using speed method:
     double cpu_time;
     cpu_time = speed(r);
