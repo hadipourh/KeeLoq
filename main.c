@@ -59,7 +59,7 @@ int main()
     // Using speed method:
     double cpu_time;
     cpu_time = speed(r);
-    printf("speed of %d rounds of encryption\t: %f (mega byte/second)\n", r, cpu_time);
+    printf("speed of %d rounds of encryption\t: %f (Mega Bytes/Second)\n", r, cpu_time);
     
     printf("Type Enter to exit\n");
     do
