@@ -342,7 +342,7 @@ def build_keeloq_system(
     return ring, polys, key_names
 
 
-def solve_with_groebner(ring, polys, key_names, verbose: bool = True):
+def solve_with_groebner(ring, polys, key_names, verbose: bool = True, target_key: int = None):
     """
     Solve the polynomial system using Groebner basis.
     
@@ -409,6 +409,12 @@ def solve_with_groebner(ring, polys, key_names, verbose: bool = True):
             # Show which bits we recovered
             recovered = sorted(key_bits.keys())
             print(f"Recovered bit indices: {recovered[:10]}{'...' if len(recovered) > 10 else ''}")
+    
+    # Verify partial recovery against target key if provided
+    if key_bits and target_key is not None:
+        correct = sum(1 for i, b in key_bits.items() if ((target_key >> i) & 1) == b)
+        if verbose:
+            print(f"Verification: {correct}/{len(key_bits)} recovered bits match target key")
     
     if len(key_bits) == 64:
         key = sum(bit << i for i, bit in key_bits.items())
@@ -495,7 +501,7 @@ def main():
     
     # Solve
     print("\nSolving with Groebner basis...")
-    recovered_key = solve_with_groebner(ring, polys, key_names, args.verbose)
+    recovered_key = solve_with_groebner(ring, polys, key_names, args.verbose, args.key)
     
     print("\n" + "=" * 60)
     if recovered_key is not None:
