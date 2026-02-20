@@ -1,40 +1,73 @@
-# -*- MakeFile -*-
+# KeeLoq Cipher - Makefile
+# Author: H. Hadipour
 
-# @H. Hadipour
-# April 19, 2019
+CC       := gcc
+PYTHON   := python3
+TARGET   := keeloq
 
-# The main structure of a make file commands is as follows: 
-# target: dependencies
-#       action
-# Example: 
-# output: main.o minor1.o minor2.o
-#         g++ -o main main.o minor1.o minor2.o
-# Some compiler flags:
-# -E                       Preprocess only; do not compile, assemble or link.
-# -S                       Compile only; do not assemble or link. (generates an assembly file and stop)
-# -c                       Compile and assemble, but do not link. (generates an assembly code and converts it to the machine code by assembler)
-# -o <file>                Place the output into <file>. (Links assembled files, and builds an executable file)
-# -g    adds debugging information to the executable file
-# -Wall turns on most, but not all, compiler warnings
-# If you don't use a flag at all, your compiler (gcc here) do the process, compile
+# Build mode: debug (default) or release
+BUILD    ?= debug
 
-# compiler
-# define the C compiler to use
-# for C++ define  CC = g++
-CC = gcc
-CFLAGS  = -g -Wall
-# the build target(s) executable:
-TARGET = main
-# If you execute make without a flag, it does the actions under the "all" target by default
-all: main.o speed.o polygen.o speed.o keeloq.o
-	$(CC) $(CFLAGS) -o $(TARGET) main.o keeloq.o speed.o polygen.o
-main.o: main.c keeloq.c keeloq.h polygen.c speed.c
+ifeq ($(BUILD),release)
+    CFLAGS := -O3 -Wall
+else
+    CFLAGS := -g -Wall
+endif
+
+# Source files
+SRCS := main.c keeloq.c speed.c attacks/polygen.c
+OBJS := main.o keeloq.o speed.o polygen.o
+
+# Default target
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+main.o: main.c keeloq.h speed.h attacks/polygen.h
 	$(CC) $(CFLAGS) -c main.c
-speed.o: speed.c speed.h keeloq.h 
-	$(CC) $(CFLAGS) -c speed.c
-polygen.o: polygen.c
-	$(CC) $(CFLAGS) -c polygen.c 
+
 keeloq.o: keeloq.c keeloq.h
 	$(CC) $(CFLAGS) -c keeloq.c
+
+speed.o: speed.c speed.h keeloq.h
+	$(CC) $(CFLAGS) -c speed.c
+
+polygen.o: attacks/polygen.c attacks/polygen.h
+	$(CC) $(CFLAGS) -c attacks/polygen.c
+
+# Build modes
+debug:
+	$(MAKE) BUILD=debug all
+
+release:
+	$(MAKE) BUILD=release all
+
+# Run targets
+run: $(TARGET)
+	./$(TARGET)
+
+speed: $(TARGET)
+	./$(TARGET) speed
+
+polygen: $(TARGET)
+	./$(TARGET) polygen
+
+# Cryptanalysis (Python)
+groebner:
+	$(PYTHON) attacks/groebner_solver.py
+
+sat:
+	$(PYTHON) attacks/sat_solver.py
+
+# Setup
+setup-python:
+	$(PYTHON) -m pip install -r requirements.txt
+
+# Cleanup
 clean:
-	rm -f *.o $(TARGET)
+	rm -f $(OBJS) $(TARGET) mqkeeloq.txt
+	rm -rf attacks/__pycache__
+	find . -name "*.pyc" -delete
+
+.PHONY: all debug release run speed polygen groebner sat setup-python clean
