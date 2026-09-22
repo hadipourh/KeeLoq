@@ -5,6 +5,8 @@ DOI: [10.1007/978-3-540-78967-3_1](https://doi.org/10.1007/978-3-540-78967-3_1)
 
 This folder contains the repository implementations of the slide plus meet in the middle attack on full 528 round KeeLoq.
 
+Run the commands below from `attacks/mitm/`. The CLIs generate synthetic pairs from a supplied key; they do not currently load an external capture file. `--inject-slid-pair` constructs a known slid pair for testing and must not be counted as evidence of natural attack success probability. Section numbers below refer to the EUROCRYPT 2008 paper cited above.
+
 ## Read This First
 
 This README has three goals:
@@ -19,11 +21,11 @@ If you only want to run code, start with Quick Start. Then return to the theory 
 
 ## Quick Start
 
-### Recommended GPU path
+### Baseline GPU path (fastest in the recorded RTX PRO 6000 benchmark)
 
 ```bash
-make gpu-kp1515 CUDA_ARCH=sm_90 KP1515_OV_BATCH=1
-./mitm_gpu_kp1515 000000000000001F --pairs-log2 14 --inject-slid-pair --max-k0 32
+make gpu-baseline CUDA_ARCH=sm_120
+./mitm_gpu_baseline 000000000000001F --pairs-log2 8 --inject-slid-pair --max-k0 32
 ```
 
 For an H100 or H200, use the Hopper-specific build and bounded benchmark:
@@ -33,12 +35,14 @@ make gpu-hopper
 make benchmark-hopper
 ```
 
-### Cross check with the baseline profile
+### Compare with the lower nominal-complexity profile
 
 ```bash
-make gpu-baseline CUDA_ARCH=sm_90
-./mitm_gpu_baseline 000000000000001F --pairs-log2 14 --inject-slid-pair --max-k0 32
+make gpu-kp1515 CUDA_ARCH=sm_120 KP1515_OV_BATCH=1
+./mitm_gpu_kp1515 000000000000001F --pairs-log2 8 --inject-slid-pair --max-k0 32
 ```
+
+Use your GPU's architecture instead of `sm_120` when appropriate; for example, H100/H200 uses `sm_90`. Use `make -B` or clean before changing architecture or tuning flags, since Make does not track flag changes as dependencies.
 
 ### CPU generalized reference
 
@@ -55,7 +59,7 @@ This is the generalized CPU path. It exposes the paper parameters directly, incl
 bash random_small_key_recovery.sh --cpu-only --baseline-trials 1 --kp1515-trials 1 --cp2013-trials 1 --max-k0 16 --pairs-log2 8
 ```
 
-This validates the CPU reference on three small deterministic recovery cases. For GPU validation, run the same script without `--cpu-only`, or use `--gpu-only` on a CUDA machine.
+This validates the CPU reference on three bounded random-key cases, each with an injected slid pair. Keys are generated anew on each invocation; retain the printed keys and commands to reproduce a particular run. For GPU validation, run the same script without `--cpu-only`, or use `--gpu-only` on a CUDA machine.
 
 ---
 
@@ -83,13 +87,13 @@ $$
 
 When such a pair exists, the repeating structure of the cipher lets us split the full 528 round encryption into manageable pieces.
 
-**Why $2^{16}$ records?** We need at least one slid pair in the data. Consider any ordered pair $(P_i, P_j)$ with $i \neq j$. For it to be a slid pair, $P_j$ must equal the specific 32 bit value $E_{64}(K, P_i)$. Since $P_j$ is drawn uniformly from $\{0,1\}^{32}$, this happens with probability $2^{-32}$. With $N$ plaintexts there are $N(N-1)$ ordered pairs, so the number of slid pairs follows a $\text{Binomial}(N(N-1),\, 2^{-32})$ distribution with expected value
+**Why $2^{16}$ records?** The attack needs a slid pair. Under the random-permutation and random-data heuristic, an ordered pair of distinct records satisfies $P_j=E_{64}(K,P_i)$ with probability about $2^{-32}$. With $N(N-1)$ ordered candidates, the expected count is approximately
 
 $$
 \mu = \frac{N(N-1)}{2^{32}} \approx \frac{N^2}{2^{32}}.
 $$
 
-For small $\mu$, Binomial($n$, $p$) is well approximated by Poisson($\mu$), so
+The pair events share records and are not independent, so the count is not exactly binomial. Using the usual sparse-event Poisson approximation gives
 
 $$
 \Pr[\text{at least one slid pair}] \approx 1 - e^{-\mu}.
@@ -103,7 +107,7 @@ Setting $\mu = 1$ gives $N \approx 2^{16}$, at which point $\Pr \approx 1 - e^{-
 
 ### Phase 1: Collect Data
 
-The attacker queries the target device with about $2^{16}$ chosen or known plaintexts and records the corresponding ciphertexts, building a dataset of pairs
+The attack assumes access to about $2^{16}$ known plaintext–ciphertext records. A chosen-plaintext setting additionally lets the attacker select the inputs. In either case the dataset is
 
 $$
 \mathcal{D} = \{(P_0, C_0),\, (P_1, C_1),\, \ldots,\, (P_{N-1}, C_{N-1})\}, \quad C_i = E_{528}(K, P_i).
@@ -156,13 +160,13 @@ $$
 P_j = E_{64}(K, P_i).
 $$
 
-Applying the same 64 round step to the ciphertext side gives
+On the ciphertext side, the key schedule starts at offset $528\bmod64=16$. Write $E'_{64}$ for that shifted 64-round map. The slid relation is
 
 $$
-C_j = E_{64}(K, C_i).
+C_j = E'_{64}(K, C_i).
 $$
 
-So the attack can work with two aligned 64 round rows: one from $P_i$ to $P_j$, and one from $C_i$ to $C_j$.
+Thus the plaintext row uses chunks $K_0,K_1,K_2,K_3$, while the ciphertext row uses $K_1,K_2,K_3,K_0$, as shown in the diagram.
 
 #### Symbol Guide
 
@@ -173,7 +177,7 @@ To make the notation easier to follow, read the symbols below as plain names:
 | $P_i$       | P i      | plaintext record $i$                                      |
 | $C_i$       | C i      | ciphertext record $i$                                     |
 | $P_j$       | P j      | plaintext paired with $P_i$ by one 64 round step          |
-| $C_j$       | C j      | ciphertext paired with $C_i$ by the same 64 round step    |
+| $C_j$       | C j      | ciphertext paired with $C_i$ by the 64-round map starting at key offset 16 |
 | $X_i$       | X i      | $P_i$ after the first 16 forward rounds                   |
 | $Y_i$       | Y i      | $C_i$ after the last 16 rounds are removed                |
 | $X^\star_i$ | X star i | $X_i$ after 16 more forward rounds                        |
@@ -270,7 +274,7 @@ for each K₀ candidate:                             // 2^16 iterations
                 if K₂a != K₂b: continue
                 K₂ = K₂a
                 K  = K₃ || K₂ || K₁ || K₀
-                if verify(K, dataset):
+                if verify_selected_pairs(K, dataset):
                     return K                        // FOUND
 ```
 
@@ -322,7 +326,7 @@ $$
 K = K_3 \parallel K_2 \parallel K_1 \parallel K_0
 $$
 
-and verify the candidate key against known pairs. This cross-check removes many false positives before final verification.
+and verify the candidate key against known pairs. The generalized CPU reference checks records 0, 1, i, and j; GPU kernels check records 0 and 1 before reporting a match. The benchmark then compares with the known synthetic key. These are selected-pair checks, not a scan of the entire dataset. This cross-check removes many false positives before final verification.
 
 **Generalized pseudocode ($(t_p, t_c, t_o)$).**
 
@@ -357,7 +361,7 @@ for each K₀ candidate:
         table = new_hash_table()                   // created here (ov-scope), discarded after this ov
 
         for each record j:
-            // j-scope temporaries: np:log2(2^(tc-to)), P⋆ⱼ:32, K₃:tc, Y⋆ⱼ:32
+            // j-scope temporaries: np:candidate count, P⋆ⱼ:32, K₃:tc, Y⋆ⱼ:32
             np = build_pstar_candidates(Pⱼ, ov, tc, to, Pstar_candidates)
 
             for each P⋆ⱼ in Pstar_candidates[0..np-1]:
@@ -367,7 +371,7 @@ for each K₀ candidate:
                 table.store(key=Y⋆ⱼ[to-1:0], value=(P⋆ⱼ, Y⋆ⱼ, K₃, j))
 
         for each record i:
-            // i-scope temporaries: nx:log2(2^(tp-to)), X⋆ᵢ:32, K₁:tp, C⋆ᵢ:32, probe:to
+            // i-scope temporaries: nx:candidate count, X⋆ᵢ:32, K₁:tp, C⋆ᵢ:32, probe:to
             Xᵢ = X_cache[i]
             nx = build_xstar_candidates(Xᵢ, ov, tp, to, Xstar_candidates)
 
@@ -383,35 +387,19 @@ for each K₀ candidate:
                     Kmid_from_P = linear_extract(X⋆ᵢ, P⋆ⱼ, 16+tp, 48-tp-tc)
                     if Kmid_from_C != Kmid_from_P: continue
                     K  = K₃ || Kmid_from_C || K₁ || K₀
-                    if verify(K, dataset):
+                    if verify_selected_pairs(K, dataset):
                         return K                        // FOUND
 ```
 
 **Complexity from the pseudocode loop counts.**
 
-Reading the nested loops directly:
+For the baseline $(16,16,16)$ profile, the cache step costs $2^{16}\cdot N\cdot32=2^{37}$ round operations at $N=2^{16}$. Each right-side candidate needs both a 16-round extraction and a 16-round decryption; each left-side candidate similarly needs extraction and encryption. Counting both operations, the inner build/probe work before collision checks is
 
-| Loop level       | Iterations                | Work per iteration                                                      | Total round-ops                                 |
-| ---------------- | ------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------- |
-| $K_0$ outer    | $2^{16}$                | Step 1:$2 \times 2^{16}$ records $\times$ 16 rounds each            | $2^{37}$                                      |
-| $K_0$ + $ov$ | $2^{16} \times 2^{t_o}$ | Right side:$2^{16}$ records $\times$ $t_c$ rounds (dec + extract) | $2^{16} \cdot 2^{t_o} \cdot 2^{16} \cdot t_c$ |
-| $K_0$ + $ov$ | $2^{16} \times 2^{t_o}$ | Left side:$2^{16}$ records $\times$ $t_p$ rounds (enc + extract)  | $2^{16} \cdot 2^{t_o} \cdot 2^{16} \cdot t_p$ |
+$$2^{16}\cdot2^{16}\cdot2^{16}\cdot(2t_c+2t_p)=2^{54}\text{ round operations}.$$
 
-Step 1 ($2^{37}$ rounds) is negligible. The dominant terms are the right- and left-side inner bodies. For the **baseline** profile $t_p = t_c = t_o = 16$:
+Dividing by 528 gives about $2^{45}$ full-encryption equivalents. Counting only one operation on each side would miss a factor of two.
 
-$$
-\underbrace{2^{16}}_\text{K₀} \times \underbrace{2^{16}}_{ov} \times \underbrace{2^{16}}_\text{records} \times (t_c + t_p)
-= 2^{48} \times 32
-= 2^{53} \text{ single-round operations}.
-$$
-
-Converting to full KeeLoq units (528 rounds $\approx 2^{9.0}$ rounds):
-
-$$
-\frac{2^{53}}{528} \approx \frac{2^{53}}{2^{9.0}} = 2^{44.0} \text{ KeeLoq-equivalent encryptions}.
-$$
-
-This raw loop count is intentionally implementation oriented. It counts the dominant partial encryption and decryption work, but it omits the paper's explicit collision-verification term. In Sect. 3.3 the paper models the baseline cost as
+In Sect. 3.3 the paper models the baseline cost as
 
 $$
 2^{16} \left( 32 \cdot 2^{16} + 2^{16} \left( 32 \cdot 2^{16} + 2^{16} (32 + N_{\text{coll}} \cdot V) \right) \right),
@@ -419,27 +407,27 @@ $$
 
 with $N_{\text{coll}} = 1$ and average verification cost $V \approx 4$. This gives about $2^{54.0}$ KeeLoq rounds, or about $2^{45.0}$ full KeeLoq encryptions, which is the figure quoted in the paper.
 
-For the **generalized** implementation, the overlap guess fixes only `to` bits. The remaining `tc-to` low bits of $P^\star_j$ and `tp-to` high bits of $X^\star_i$ are enumerated explicitly by `build_pstar_candidates()` and `build_xstar_candidates()`. Sect. 3.4 of the paper gives the corresponding general expression
+For the **generalized** implementation, the overlap guess fixes only `to` bits. When these counts are nonnegative, the remaining `tc-to` low bits of $P^\star_j$ and `tp-to` high bits of $X^\star_i$ are enumerated explicitly by `build_pstar_candidates()` and `build_xstar_candidates()`. Sect. 3.4 of the paper gives the corresponding general expression
 
 $$
 2^{16} \left( 32 \cdot 2^{16} + 2^{t_o} \left( 2t_c \cdot 2^{16+t_c-t_o} + 2^{16+t_p-t_o}(2t_p + N_{\text{coll}} \cdot V) \right) \right),
 $$
 
-which simplifies there to an optimum at $(t_p, t_c, t_o) = (15,15,14)$ with time about $2^{44.5}$ full KeeLoq encryptions. Our generalized code follows the same geometry, but expresses it operationally by explicitly enumerating the admissible $P^\star_j$ and $X^\star_i$ candidates. At that implementation level the dominant inner work scales as
+which simplifies there to an optimum at $(t_p, t_c, t_o) = (15,15,14)$ with time about $2^{44.5}$ full KeeLoq encryptions. Our generalized code follows the same geometry, but expresses it operationally by explicitly enumerating the admissible $P^\star_j$ and $X^\star_i$ candidates. For profiles with $t_p,t_c\geq t_o$, the corresponding partial-round work before collision checks scales as
 
 $$
-2^{16} \cdot 2^{t_o} \cdot N \cdot \big(2^{t_c-t_o} \cdot t_c + 2^{t_p-t_o} \cdot t_p\big),
+2^{16} \cdot 2^{t_o} \cdot N \cdot \big(2^{t_c-t_o} \cdot 2t_c + 2^{t_p-t_o} \cdot 2t_p\big),
 $$
 
-before adding hash-table overhead, collision testing, and final verification. The repository profiles `(15,15,14)` and `(20,13,17)` match the paper's Sect. 3.4 and Sect. 3.5 geometries, while the exact wall-clock cost depends on these extra enumeration and verification terms. Note however that `mitm_gpu_cp2013` implements the fixed `(20,13,17)` geometry only; unlike the paper's chosen-plaintext attack, it does not enforce a chosen-plaintext structure or reduce the overlap-guess space from $2^{17}$ to $2^{13}$.
+before adding hash-table overhead, collision testing, and final verification. If $t_c<t_o$ or $t_p<t_o$, an overlap may conflict with passthrough bits and produce no candidate; the bounds below use nonnegative free-bit counts. The repository profiles `(15,15,14)` and `(20,13,17)` match the paper's Sect. 3.4 and Sect. 3.5 geometries, while the exact wall-clock cost depends on these extra enumeration and verification terms. Note however that `mitm_gpu_cp2013` implements the fixed `(20,13,17)` geometry only; unlike the paper's chosen-plaintext attack, it does not enforce a chosen-plaintext structure or reduce the overlap-guess space from $2^{17}$ to $2^{13}$.
 
 **Memory from the pseudocode data structures.**
 
 For each fixed $K_0$, the pseudocode keeps:
 
 - Cache arrays: `X_cache[0..N-1]` and `Y_cache[0..N-1]` (storing $X_i$ and $Y_i$), each one 32-bit word per record.
-- Per-overlap hash table: created inside each `u`/`ov` iteration (one live table at a time), up to $N$ entries in baseline and up to $N \cdot 2^{t_c-t_o}$ entries in generalized. Each generalized entry stores enough data for the later cross-check, e.g. `(P⋆ⱼ, Y⋆ⱼ, K₃, j)`.
-- Generalized only: `Pstar_candidates`, a temporary buffer of up to $2^{t_c-t_o}$ candidate 32-bit states for the current record, and `Xstar_candidates`, a temporary buffer of up to $2^{t_p-t_o}$ candidate 32-bit states.
+- Per-overlap hash table: created inside each `u`/`ov` iteration (one live table at a time), up to $N$ entries in baseline and up to $N \cdot 2^{\max(t_c-t_o,0)}$ entries in generalized. Each generalized entry stores enough data for the later cross-check, e.g. `(P⋆ⱼ, Y⋆ⱼ, K₃, j)`.
+- Generalized only: `Pstar_candidates`, a temporary buffer of up to $2^{\max(t_c-t_o,0)}$ candidate 32-bit states for the current record, and `Xstar_candidates`, a temporary buffer of up to $2^{\max(t_p-t_o,0)}$ candidate 32-bit states.
 - Scalar/scratch state: one copy of loop indices, overlap guess, temporary states, probe, key fragments, assembled key (explicit widths listed in each pseudocode block), totaling $O(1)$ words.
 
 So the working memory is
@@ -447,14 +435,14 @@ So the working memory is
 $$
 M_{\text{baseline}} = O(N),
 \qquad
-M_{\text{generalized}} = O\!\left(N \cdot 2^{t_c-t_o}\right) + O\!\left(2^{t_c-t_o} + 2^{t_p-t_o}\right),
+M_{\text{generalized}} = O\!\left(N \cdot 2^{\max(t_c-t_o,0)}\right) + O\!\left(2^{\max(t_c-t_o,0)} + 2^{\max(t_p-t_o,0)} + 2^{t_o}\right),
 $$
 
-where the second term is the temporary candidate storage and the dominant generalized term comes from the enlarged per-overlap right-side table.
+The terms account for stored records, candidate buffers, and the $2^{t_o}$ bucket heads. These are per-overlap CPU bounds; GPU batches multiply storage by their active batch dimensions. Candidates are not fractionally allocated when $t_c<t_o$.
 
 For comparison with the paper: Sect. 3.3 counts a much more compact **theoretical** baseline table — $2^{16}$ records of 80 bits each — together with the KP pairs and the cached $X_i, Y_i$, giving a total of a little over 2 MB. Our implementation keeps a richer payload per entry (to simplify later reconstruction and cross-checking), so its actual in-memory layout is somewhat larger than the paper's minimal estimate even though it follows the same attack logic.
 
-Correctness note: the maintained CPU and GPU implementations store **all** right-side candidates for a bucket by using exact head/next chains over the record array; they do not cap each bucket to a fixed number of slots. This avoids the silent false negatives that a bounded per-bucket layout would introduce.
+Correctness note: every right-side candidate is retained. The CPU implementations and baseline/cp2013 GPU profiles use head/next chains; the kp1515 GPU profile uses contiguous bucket ranges built by count, prefix-sum, and scatter kernels. None uses a fixed per-bucket slot cap.
 
 This repository implements all three profiles from the paper:
 
@@ -508,7 +496,7 @@ graph TB
 
     K2["Extract K₂ from both paths and cross-check"]
     ASM["K = K₃ || K₂ || K₁ || K₀"]
-    VER{"E528(K, Pᵢ) = Cᵢ for all i?"}
+    VER{"Candidate passes selected full-round pairs?"}
     YES["FOUND"]
     NO["REJECT"]
 
@@ -542,7 +530,7 @@ graph TB
 | Data                    | $2^{16}$ known plaintext/ciphertext pairs |
 | Time (profile 16/16/16) | about$2^{45.0}$ encryptions               |
 | Time (profile 15/15/14) | about$2^{44.5}$ encryptions               |
-| Time (profile 20/13/17) | about$2^{44.5}$ encryptions               |
+| Time (profile 20/13/17, chosen-plaintext reduction) | about $2^{44.5}$ encryptions; not the geometry-only GPU binary |
 
 Design note: `mitm_generalized` is the CPU reference that accepts CLI profile parameters (`--tp`, `--tc`, with `to = tp + tc - 16` derived internally). The GPU binaries are intentionally profile-specific to keep kernels fast and benchmarking reproducible.
 
@@ -551,7 +539,7 @@ Design note: `mitm_generalized` is the CPU reference that accepts CLI profile pa
 | `mitm.c`            | `(16, 16, 16)` | CPU fixed-profile baseline, multithreaded, Sect. 3.3                                                                                              |
 | `mitm_generalized`  | configurable     | CPU generalized CLI path (`--tp`, `--tc`; `to` derived); covers all three profiles; chosen plaintext via `--chosen` (Sect. 3.3, 3.4, 3.5) |
 | `mitm_gpu_baseline` | `(16, 16, 16)` | GPU baseline, Sect. 3.3                                                                                                                           |
-| `mitm_gpu_kp1515`   | `(15, 15, 14)` | GPU, recommended production path, Sect. 3.4                                                                                                       |
+| `mitm_gpu_kp1515`   | `(15, 15, 14)` | GPU, lower nominal-complexity profile, Sect. 3.4; compare measured speed with baseline |
 | `mitm_gpu_cp2013`   | `(20, 13, 17)` | GPU, fixed Sect. 3.5 geometry only; it does not enforce chosen-plaintext structure and does not expose free `cp_mask`/`cp_value` like `mitm_generalized --chosen` |
 
 ### Repository Execution Paths
@@ -562,11 +550,11 @@ flowchart LR
     B -->|CPU baseline| C1["mitm<br/>fixed 16/16/16"]
     B -->|CPU generalized| C2["mitm_generalized<br/>CLI-selected profile"]
     B -->|GPU baseline| C3["mitm_gpu_baseline<br/>fixed 16/16/16"]
-    B -->|GPU recommended| C4["mitm_gpu_kp1515<br/>fixed 15/15/14"]
+    B -->|GPU lower nominal work| C4["mitm_gpu_kp1515<br/>fixed 15/15/14"]
     B -->|GPU geometry-only| C5["mitm_gpu_cp2013<br/>fixed 20/13/17"]
     C1 --> D1["Compute X/Y caches<br/>build right side<br/>probe left side"]
     C2 --> D2["Enumerate profile-specific<br/>P⋆/X⋆ candidates"]
-    C3 --> D3["GPU batches over k0 and overlap<br/>exact bucket chaining"]
+    C3 --> D3["GPU batches over k0 and overlap<br/>exact bucket storage"]
     C4 --> D3
     C5 --> D3
     D1 --> E["Collision filtering<br/>middle-key consistency check<br/>final verification"]
@@ -579,7 +567,7 @@ flowchart LR
 
 ## Repository Status
 
-- Main GPU path for practical runs: `mitm_gpu_kp1515`
+- Fastest profile in the recorded RTX PRO 6000 runs: `mitm_gpu_baseline`; `mitm_gpu_kp1515` remains the Makefile's default GPU target. Compare both on other hardware.
 - Main CPU reference path: `mitm_generalized`
 - GPU check status: `mitm_gpu_baseline`, `mitm_gpu_kp1515`, and `mitm_gpu_cp2013` all recover known test keys in bounded runs with `--pairs-log2`, `--max-k0`, and `--inject-slid-pair`. The random bounded regression passes `18/18` trials across the three profiles (2 baseline, 10 kp1515, 6 cp2013) in 32 s at `--pairs-log2 8 --max-k0 64`.
 - Throughput status: measured on an NVIDIA RTX PRO 6000 Blackwell Workstation Edition (`sm_120`), each profile over 64 low-key values at `--pairs-log2 16`. See the table below.
@@ -596,7 +584,7 @@ flowchart LR
 | `mitm_generalized.c`   | CPU reference with parameterized overlap profile `(t_p, t_c, t_o)` |
 | `mitm_generalized.h`   | Shared helpers and profile declarations                              |
 | `mitm_gpu_baseline.cu` | GPU baseline, fixed profile `(16,16,16)`                           |
-| `mitm_gpu_kp1515.cu`   | GPU implementation, fixed profile `(15,15,14)`, recommended path   |
+| `mitm_gpu_kp1515.cu`   | GPU implementation, fixed profile `(15,15,14)`, contiguous bucket storage |
 | `mitm_gpu_cp2013.cu`   | GPU candidate, fixed `(20,13,17)` geometry from the chosen-plaintext section |
 | `random_small_key_recovery.sh` | bounded randomized regression runner for small-key recovery checks |
 | `Makefile`             | Build and cleanup targets                                            |
@@ -624,10 +612,12 @@ Interpretation:
 - All three CPU profiles recovered the expected full 64 bit key in bounded deterministic tests.
 - The cp2013 geometry needs much more time than baseline and kp1515 in this CPU test setup.
 
-Example GPU-server regression command for the recommended profile:
+Command matching the documented 18-trial GPU regression configuration:
 
 ```bash
-make clean && make gpu-kp1515 CUDA_ARCH=sm_120 KP1515_OV_BATCH=1 GPU_STATS=0 && time -p bash random_small_key_recovery.sh --gpu-only --no-build --pairs-log2 11 --max-k0 15361 --baseline-trials 0 --kp1515-trials 10 --cp2013-trials 0
+make -B gpu-baseline gpu-kp1515 gpu-cp2013 CUDA_ARCH=sm_120 GPU_STATS=0
+time -p bash random_small_key_recovery.sh --gpu-only --no-build \
+  --pairs-log2 8 --max-k0 64 --baseline-trials 2 --kp1515-trials 10 --cp2013-trials 6
 ```
 
 Measured result on an NVIDIA RTX PRO 6000 Blackwell Workstation Edition (`sm_120`), with
@@ -677,7 +667,7 @@ make gpu-cp2013 CUDA_ARCH=sm_90
 make gpu-hopper
 ```
 
-`make gpu` is an alias of the recommended `make gpu-kp1515` path.
+`make gpu` builds `mitm_gpu_kp1515`; this is a Makefile default, not a claim that it is fastest on every GPU.
 `make gpu-hopper` builds all three profiles for `sm_90`, shared by H100 and H200,
 with a memory-efficient batch geometry measured on H100. `make gpu-h200` remains
 a compatibility alias. Other GPUs use the ordinary targets with an explicit
@@ -723,8 +713,11 @@ These run the Sect. 3.3, Sect. 3.4, and Sect. 3.5 profiles respectively.
 ### Chosen plaintext reduction example
 
 ```bash
-./mitm_generalized --tp 20 --tc 13 --chosen --cp-mask 0000000F --cp-value 00000005 --pairs-log2 8 --max-k0 32
+./mitm_generalized --tp 20 --tc 13 --chosen --cp-mask 0000000F --cp-value 00000005 \
+  --pairs-log2 8 --max-k0 32 --key 0000000000000005 --inject-slid-pair
 ```
+
+This is a bounded test with a low-key value inside the scan range. Chosen-compatible pair injection is attempted with a finite budget; check for the warning if injection fails. The small dataset alone is not expected to contain a natural slid pair reliably.
 
 ---
 
@@ -737,7 +730,7 @@ make gpu-baseline CUDA_ARCH=sm_90
 ./mitm_gpu_baseline 0000000000000005 --pairs-log2 8 --inject-slid-pair --max-k0 32
 ```
 
-### Recommended GPU profile `(15,15,14)`
+### Lower nominal-complexity GPU profile `(15,15,14)`
 
 ```bash
 make gpu-kp1515 CUDA_ARCH=sm_90 KP1515_OV_BATCH=1
@@ -768,7 +761,7 @@ The default Hopper geometry is `K0_BATCH=64`, overlap batch `1`, found checks ev
 4096 overlap guesses, and GPU statistics disabled. The small `64 x 1` batch geometry is
 deliberate: enlarging it to `256 x 32` multiplies the hash-table allocation by roughly two orders
 of magnitude for a wall-time difference around 1%, so the compact geometry is the better default.
-At `2^16` pairs the kp1515 allocation is 140.5 MB. For a longer throughput sample, use, for
+At `2^16` pairs the kp1515 named-buffer allocation is 140.5 MiB, plus CUB scan workspace and runtime overhead. For a longer throughput sample, use, for
 example:
 
 ```bash
@@ -797,7 +790,7 @@ bash random_small_key_recovery.sh --baseline-trials 1 --kp1515-trials 2 --cp2013
 
 Recommended use:
 
-- Use `--inject-slid-pair` indirectly through the script's built-in test commands so each reduced test is deterministic.
+- Use `--inject-slid-pair` indirectly through the script's built-in test commands to supply a known slid pair for each reduced test. The script still chooses fresh random keys.
 - Keep `--max-k0` small (for example `16` or `64`) so the true low 16 key bits always lie in the scanned range while runtimes stay short.
 - Use `--cpu-only` for the generalized reference, `--gpu-only` for CUDA-only smoke checks, or no mode flag to run both.
 - Treat this as a regression/sanity suite, not as a measurement of full attack runtime.
@@ -811,11 +804,14 @@ Recommended use:
 | Pascal        | `sm_60`     |
 | Volta         | `sm_70`     |
 | Turing        | `sm_75`     |
-| Ampere        | `sm_80`     |
+| Ampere A100   | `sm_80`     |
+| Ampere RTX 30-series / A10 | `sm_86` |
 | Ada           | `sm_89`     |
 | Hopper / H100 | `sm_90`     |
 | Blackwell (data center) | `sm_100`    |
-| Blackwell (RTX 50xx)    | `sm_120`    |
+| Blackwell (RTX 50xx / RTX PRO 6000 Workstation) | `sm_120` |
+
+Confirm the exact device in NVIDIA's [compute-capability list](https://developer.nvidia.com/cuda/gpus) and use a CUDA Toolkit that supports its target. The table does not imply that every toolkit release supports every older architecture.
 
 ---
 
@@ -835,12 +831,12 @@ flowchart TB
     classDef ok fill:#C8E6C9,stroke:#1B5E20,stroke-width:2px,color:#000
     classDef bad fill:#FFCDD2,stroke:#C62828,stroke-width:2px,color:#000
 
-    H0["Host: generate / load pairs (P, C)<br/>copy pair arrays to device once"] --> K0["Outer loop over k0 batches"]
+    H0["Host: generate test pairs (P, C)<br/>copy pair arrays to device once"] --> K0["Outer loop over k0 batches"]
     K0 --> XY["Kernel 1: compute X and Y caches<br/>for all records in the current k0 batch"]
     XY --> OV["Inner loop over overlap batches<br/>(u in baseline, ov in generalized GPU profiles)"]
-    OV --> CLR["Reset bucket-head array for this batch"]
-    CLR --> RH["Kernel 2: right-side build<br/>enumerate j-side candidates<br/>extract K3, compute Y⋆, insert every record into exact head/next chains"]
-    RH --> LH["Kernel 3: left-side probe<br/>enumerate i-side candidates<br/>extract K1, compute C⋆, traverse full bucket chains"]
+    OV --> CLR["Reset bucket metadata for this batch"]
+    CLR --> RH["Right-side construction<br/>baseline/cp2013: head/next chains<br/>kp1515: count, prefix sum, scatter"]
+    RH --> LH["Left-side probe<br/>extract K1, compute C⋆<br/>visit every candidate in matching bucket"]
     LH --> CC{"Collision survives<br/>middle-key consistency?"}
     CC -->|No| SYNC["Periodic synchronize + check found flag"]
     CC -->|Yes| VF["Verify full candidate key on known pairs"]
@@ -865,9 +861,9 @@ Implementation notes:
 - `mitm_gpu_baseline` batches over `k0` and the 16-bit overlap guess `u`.
 - `mitm_gpu_kp1515` batches over `k0` and the 14-bit overlap `ov`; each `(j, ov)` and `(i, ov)` has multiplicity 2.
 - `mitm_gpu_cp2013` batches over `k0` and the 17-bit overlap `ov`; the right side has at most one admissible `P⋆ⱼ` per `(j, ov)`, while the left side enumerates 8 `X⋆ᵢ` candidates.
-- The maintained GPU code uses exact bucket chains (`head` / `next`) so every right-side candidate is retained; no per-bucket candidate truncation is allowed.
+- Baseline and cp2013 use exact `head` / `next` chains. Kp1515 counts entries, computes bucket offsets with CUB, and scatters entries into contiguous ranges. Every candidate is retained; there is no per-bucket truncation.
 - The host checks the global `found` flag periodically between overlap batches to avoid synchronizing after every kernel launch.
-- Hash records store the fixed-profile `K3` fragment in compact unshifted form, reducing each record from 16 to 12 bytes without changing candidate enumeration.
+- Baseline/cp2013 use 12-byte chained records with a compact `K3` fragment. Kp1515 uses the same 12-byte records without a separate `next` array, plus bucket count/start/fill arrays and CUB scan workspace.
 - Bucket resets use the active batch size and remain ordered with the kernels in the default CUDA stream.
 
 ---
@@ -902,16 +898,17 @@ All three GPU profiles measured on an NVIDIA RTX PRO 6000 Blackwell Workstation 
 (`sm_120`, 188 SMs), each over 64 low-key values at `--pairs-log2 16` with a key outside the
 scanned range so the full budget runs:
 
-| Profile | Bounded run (64 `k0`) | Per `k0` | Full `2^16` scan | Device memory |
+| Profile | Bounded run (64 `k0`) | Per `k0` | Full `2^16` scan | Reported buffer memory |
 | ------- | ---------------------: | -------: | ---------------: | ------------: |
-| `mitm_gpu_baseline` (16,16,16) | 17.58 s | 0.275 s | about 5.0 h | 112.5 MB |
-| `mitm_gpu_kp1515` (15,15,14) | 22.37 s | 0.349 s | about 6.4 h | 140.5 MB |
-| `mitm_gpu_cp2013` (20,13,17) | 130.27 s | 2.036 s | about 37.1 h | 64.5 MB |
+| `mitm_gpu_baseline` (16,16,16) | 17.58 s | 0.275 s | about 5.0 h | 112.5 MiB |
+| `mitm_gpu_kp1515` (15,15,14) | 22.37 s | 0.349 s | about 6.4 h | 140.5 MiB + scan workspace |
+| `mitm_gpu_cp2013` (20,13,17) | 130.27 s | 2.036 s | about 37.1 h | 64.5 MiB |
 
 | Hardware         | Full-scan wall time | Notes                                    |
 | ---------------- | ------------------- | ---------------------------------------- |
 | RTX PRO 6000 Blackwell (`sm_120`) | 5.0 h to 6.4 h | best two profiles, extrapolated from bounded runs |
-| Large CPU server | weeks               |                                          |
+
+The programs label binary-megabyte values as MB; this table uses MiB. The kp1515 printed total excludes its separately allocated CUB scan workspace.
 
 Per-`k0` cost is essentially uniform, so these extrapolations are stable, but they are still
 extrapolations rather than completed full-scale runs.
@@ -920,10 +917,7 @@ extrapolations rather than completed full-scale runs.
 (about $2^{44.5}$ against $2^{45.0}$), yet the baseline `(16,16,16)` is faster in wall-clock here.
 The reason is table geometry rather than arithmetic: the baseline stores $N = 2^{16}$ entries in
 $2^{16}$ buckets, so its mean hash chain is one entry long, while `(15,15,14)` stores $2N = 2^{17}$
-entries in $2^{14}$ buckets and walks about 8 entries per probe. Those extra chain steps are
-dependent scattered memory reads, and on this hardware they cost more than the arithmetic the
-smaller overlap saves. Nominal complexity and measured wall-clock disagree here, so pick the
-profile by measurement on your own card.
+entries in $2^{14}$ buckets and examines about 8 entries per probe. The current kp1515 code stores those entries contiguously, removing linked-list traversal, but still checks all of them and adds bucket-building passes. The recorded timings favor baseline; they do not isolate the cost of each component. Choose by measurement on your card rather than nominal round-operation count alone.
 
 Two things determine how long a real attack takes beyond this rate:
 

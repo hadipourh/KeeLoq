@@ -1,114 +1,94 @@
-# Complete Mathematical Analysis of End-to-End Success Probability
+# Fixed-Point Success Model and Implementation Limits
 
-## Setup
+This note explains the full-codebook fixed-point attack and distinguishes its theoretical search coverage from the current implementation. Commands and benchmark details are in [README.md](README.md).
 
-Let $K \in \{0,1\}^{64}$ be the target key. Define $F = E_{64}(K, \cdot) : \{0,1\}^{32} \to \{0,1\}^{32}$, the 64-round KeeLoq encryption under $K$. We model $F$ as a uniformly random permutation of $\{0,1\}^{32}$.
+## Setup and Phase 1
 
-## Phase 1: Fixed-Point Detection
+For a fixed key, let $F=E_{64}(K,\cdot)$ be KeeLoq's 64-round core. Full encryption is $E_{528}=E_{16}\circ F^8$. The heuristic models **$F$**, not $F^8$, as a uniformly random permutation.
 
-**Decomposition.** KeeLoq's 528 rounds decompose as $E_{528} = E_{16} \circ F^8$, since each $F$ covers 64 rounds and $8 \times 64 + 16 = 528$.
+The attack assumes all $2^{32}$ plaintext–ciphertext pairs. The supplied scanners generate them from a known test key; their timings exclude real-world acquisition.
 
-**Goal.** Find $S \in \{0,1\}^{32}$ such that $F^8(S) = S$, i.e., $S$ lies on an $F$-cycle of length $d \mid 8$.
+For each pair $(S,C)$, test $C[0..15]=S[16..31]$. For a survivor, the feedback bits in $C[16..31]$ determine one low-key candidate through 16 rounds of peeling. There is **no $2^{16}$ key-guess loop per plaintext**.
 
-**Scan.** Evaluate $E_{528}(K, S)$ for all $2^{32}$ plaintexts $S$:
-$$E_{528}(K, S) = E_{16}(K, F^8(S))$$
-If $F^8(S) = S$, then $E_{528}(K, S) = E_{16}(K, S)$. Since $E_{16}$ only depends on $k[0..15]$, we can guess $k[0..15]$ (16-bit exhaustive search) and check:
-$$E_{16}(k[0..15], S) \stackrel{?}{=} E_{528}(K, S)$$
-A match occurs iff $k[0..15]$ is correct **and** $F^8(S) = S$.
+Group survivors by their peeled value $k_{16}$. For the true low key,
 
-**Output.** For each guessed $k_{16} \in \{0,1\}^{16}$, Phase 1 produces a **group**: the set of candidate fixed points $\mathcal{G}_{k_{16}} = \{S : E_{16}(k_{16}, S) = E_{528}(K, S)\}$.
+$$\mathcal G_{k_{16}^*}=\{S:E_{16}(k_{16}^*,S)=E_{528}(K,S)\}=\{S:F^8(S)=S\}.$$
 
-For the **correct** $k_{16}^*$, $\mathcal{G}_{k_{16}^*}$ contains exactly the true fixed points of $F^8$. For incorrect $k_{16}$, $\mathcal{G}_{k_{16}}$ contains only spurious matches.
+Invertibility of $E_{16}$ gives the equality. The true group contains exactly the true fixed points, with no extra noise votes. Wrong bins may still receive more votes, so ranking guides search order rather than deciding recovery.
 
-## Fixed-Point Count Distribution
+## Fixed-Point Distribution
 
-For a random permutation $F$ on $\{0,1\}^{32}$, the number of elements on cycles of length $d$ follows:
+A state is fixed by $F^8$ exactly when its $F$-cycle length divides 8. For a large uniform random permutation, the small-cycle counts are approximately independent:
 
-$$d \cdot X_d, \quad X_d \sim \text{Poisson}(1/d)$$
+$$X_d\approx\operatorname{Poisson}(1/d),\qquad d\in\{1,2,4,8\}.$$
 
-independently for each $d$. The number of fixed points of $F^8$ (elements on cycles of length $d \mid 8$) is:
+The modeled fixed-point count is $m=X_1+2X_2+4X_4+8X_8$, with mean 4 and variance 15. These moments are also exact for a uniform permutation on $2^{32}$ elements; the independent Poisson description of the full distribution is an approximation.
 
-$$m = \sum_{d \in \{1,2,4,8\}} d \cdot X_d$$
+In that approximation,
 
-**Moments:**
-$$\mathbb{E}[m] = \sum_{d \mid 8} d \cdot \frac{1}{d} = 4$$
-$$\text{Var}[m] = \sum_{d \mid 8} d^2 \cdot \frac{1}{d} = 1 + 2 + 4 + 8 = 15$$
+$$\Pr(m=0)\approx e^{-15/8},\qquad \Pr(m\geq1)\approx1-e^{-15/8}\approx84.7\%.$$
 
-**Presence probability** ($m \geq 1$):
-$$P(m \geq 1) = 1 - P(m = 0) = 1 - \prod_{d \mid 8} P(X_d = 0) = 1 - \prod_{d \mid 8} e^{-1/d} = 1 - e^{-(1 + 1/2 + 1/4 + 1/8)} = 1 - e^{-15/8}$$
+Exactly one fixed point requires $X_1=1$ and $X_2=X_4=X_8=0$, so
 
-$$\boxed{P(m \geq 1) = 1 - e^{-15/8} \approx 84.7\%}$$
+$$\Pr(m=1)\approx e^{-15/8}\approx15.3\%,\qquad \Pr(m\geq2)\approx1-2e^{-15/8}\approx69.3\%.$$
 
-## Phase 2: Recovery of $k[16..63]$
+These are heuristic predictions for KeeLoq, not proven probabilities over its keys.
 
-Given the true group $\mathcal{G}_{k_{16}^*}$ with $m = |\mathcal{G}_{k_{16}^*}|$ candidates, each candidate $(S_i, C_i, M_{16,i})$ satisfies:
+## Phase 2
 
-$$E_{48}(k[16..63], M_{16,i}) = F(S_i) = S_{\sigma(i)}$$
+For each survivor compute $M_{16}=E_{16}(k_{16},S)$. In the true group, $F$ permutes the group's states, giving
 
-where $\sigma$ is the $F$-successor permutation within the group.
+$$E_{48}(k[16..63],M_{16,i})=F(S_i)=S_{\sigma(i)}.$$
 
-Phase 2 processes groups in two sequential sweeps:
+### Sweep A: Groups with at Least Two Candidates
 
-### Sweep A: Directed-Pair Sweep (all groups with $n \geq 2$)
+For a group of size $n\geq2$, fix source indices 0 and 1 and try all $n^2$ target pairs $(b,d)$:
 
-For each group with $|\mathcal{G}| \geq 2$ candidates, fix source indices 0 and 1, and try all $n^2$ target combinations $(b, d)$:
-$$E_{48}(k[16..63], M_{16,0}) = S_b \quad \land \quad E_{48}(k[16..63], M_{16,1}) = S_d$$
+$$E_{48}(k[16..63],M_{16,0})=S_b,\qquad E_{48}(k[16..63],M_{16,1})=S_d.$$
 
-- **True group ($m \geq 2$):** The correct pair $(b^*, d^*) = (\sigma(0), \sigma(1))$ is guaranteed to be in the sweep. Each 2-pair SAT instance constrains 48 unknowns with 64 output bits, so has $\sim 2^{48 - 64} = 2^{-16}$ expected solutions. The true key is found with negligible false-positive probability. $\Rightarrow$ **Recovery is certain.**
-- **Wrong groups:** All $n^2$ SAT instances are UNSAT (no consistent $k[16..63]$ exists), and the solver rejects each one instantly.
-- **Order within Sweep A does not matter:** wrong groups cost $n^2$ fast UNSAT calls ($\sim 0.1$–$0.5$ ms each), so even at rank $\#10{,}000$, the total sweep over $\sim 17{,}000$ wrong n≥2 groups takes only a few seconds.
+The correct successor pair is among these hypotheses for the true group. An idealized independent-constraint model predicts about $2^{48-64}=2^{-16}$ solutions for a wrong hypothesis. Most wrong hypotheses are therefore expected to be UNSAT; this does **not** mean all are UNSAT or equally fast.
 
-### Sweep B: Exact Singleton Recovery (all groups with $n = 1$, only if Sweep A found nothing)
+Returned keys are checked against the group's full-round pairs and up to 20 additional pairs sampled from Phase 1 output. Failed candidates are blocked before another model is tried. Those sampled pairs should not be treated as 640 independently guaranteed filtering bits.
 
-This sweep runs only when $m = 1$ (the true group has exactly one candidate), which implies a 1-cycle: $F(S_0) = S_0$.
+**Implementation limit:** `try_pair_sat(..., max_enum=100)` checks at most 100 SAT models for each target pair, and `_try_directed_pairs()` uses this default. All target pairs are covered, but not necessarily all SAT models. Unconditional completeness of Sweep A would require exhaustive model enumeration. There is no CLI override for this cap.
 
-For each singleton group, the solver handles the relation $E_{48}(k[16..63], M_{16,0}) = S_0$ constructively rather than through SAT-model enumeration. This relation leaves exactly 16 residual degrees of freedom. We enumerate the 16 unknown feedback bits $f_0,\dots,f_{15}$ directly; the remaining feedback bits $f_{16},\dots,f_{47}$ are fixed by the output $S_0$, so each 16-bit guess reconstructs one full key candidate. Thus Sweep B still explores exactly $2^{16} = 65{,}536$ candidates, but with only bit operations and direct verification against 20 cross-verification pairs (640 bits of filtering), making false-positive probability $< 2^{-576}$.
+The active solver is PySAT `cadical153`. The accepted `--solver cryptominisat` option does not switch the current recovery backend.
 
-To accelerate this exhaustive scan, the current implementation optionally uses an exact GPU prefilter: it exhaustively checks every `(singleton group, prefix16)` pair against the first two verification pairs on the GPU, then lets the CPU perform full verification on the tiny survivor set. Because the GPU helper never prunes any candidate that satisfies those first two pairs, and the CPU still verifies every survivor against the full verification set, this acceleration does not change the searched space or the success probability.
+### Sweep B: Singleton Groups
 
-- **True singleton group ($m = 1$):** Exhaustive constructive enumeration guarantees recovery. $\Rightarrow$ **Recovery is certain.**
-- **Wrong singleton groups:** Each still has an exhaustive $2^{16}$ candidate family in principle, but the GPU prefilter rejects almost all of them before CPU verification. These groups are only reached in the $m = 1$ case.
-- **Why $m = 1$ implies a 1-cycle:** If $m = 1$, exactly one element sits on cycles of length $d \mid 8$. Since a cycle has $d \geq 1$ elements and only 1 is present, $d = 1$.
+When Sweep A returns no verified key, the code processes singleton groups. If the true group is a singleton, its unique state is on a 1-cycle, and $E_{48}(k[16..63],M_{16,0})=S_0$.
 
-### Why Sweep A Before Sweep B
+The first 16 feedback bits are free; the remaining 32 are fixed by the target output. Each of the $2^{16}$ prefixes reconstructs one 48-bit suffix. This is constructive enumeration, not SAT-model enumeration. Each candidate is checked against the sampled full-round pairs.
 
-Wrong singleton groups each still cost about $2^{16}$ candidate checks, so if they shared the worker pool with n≥2 groups, they would clog workers and delay reaching the true group. By deferring all singletons to Sweep B:
-- The common case ($m \geq 2$, $\sim 69.3\%$ of keys) completes in Sweep A alone, with no singleton overhead.
-- The rare case ($m = 1$, $\sim 15.3\%$ of keys) pays the singleton cost only when necessary, and the exact GPU prefilter removes the previous heavy tail in practice.
+The program first attempts a CUDA prefilter over all `(singleton group, prefix16)` combinations, testing two verification pairs. The CPU checks surviving candidates against the full verification set. If unavailable, a native C helper or Python fallback searches the same singleton completions.
 
-### Case Summary
+Sweep B also runs for absent keys ($m=0$), and may run after a Sweep A failure caused by its model cap. Reaching Sweep B does not prove that $m=1$.
 
-| Condition | Probability | Sweep | Recovery method | $P(\text{key recovered})$ |
-|---|---|---|---|---|
-| $m = 0$ | $e^{-15/8} \approx 15.3\%$ | — | impossible | 0 |
-| $m = 1$ | $\leq e^{-15/8} \approx 15.3\%$ | B | singleton constructive enum | 1 |
-| $m \geq 2$ | $\geq 1 - 2e^{-15/8} \approx 69.3\%$ | A | directed-pair sweep | 1 |
+## Success and Work
 
-## End-to-End Success Probability
+For the ideal exhaustive recovery procedure, the modeled end-to-end probability equals the presence probability, approximately 84.7%. For the program, that is a prediction supported by the experiment below, subject to the SAT-model cap, resource limits, and verification assumptions.
 
-$$P(\text{success}) = P(m \geq 2) \cdot 1 + P(m = 1) \cdot 1 + P(m = 0) \cdot 0 = P(m \geq 1)$$
-
-$$\boxed{P(\text{success}) = 1 - e^{-15/8} \approx 84.7\%}$$
-
-## Complexity Summary
-
-| Component | Cost |
+| Component | Work |
 |---|---|
-| Phase 1 scan | $2^{32}$ encryptions × $2^{16}$ key guesses (parallelized on GPU) |
-| Sweep A: wrong n≥2 group | $n^2$ UNSAT SAT calls ($\sim 0.1$–$0.5$ ms each) |
-| Sweep A: true n≥2 group ($m \geq 2$) | $\leq m^2$ SAT calls (one SAT, rest UNSAT) |
-| Sweep A total | $\leq 2^{16}$ groups, dominated by group enumeration |
-| Sweep B: wrong singleton group | exact $2^{16}$ constructive candidates, typically filtered on GPU to almost no CPU survivors |
-| Sweep B: true singleton group ($m = 1$) | exact $2^{16}$ constructive candidates, with CPU verification on GPU-prefilter survivors |
-| Sweep B total | $\leq 2^{16}$ groups, only reached for $m = 1$ case |
-| **Typical Phase 2 ($m \geq 2$)** | **Sweep A only: a few seconds** |
-| **Rare Phase 2 ($m = 1$)** | **Sweep A plus exact Sweep B; on the H100 benchmark, hard singleton keys still finished in about 22 seconds total** |
+| Phase 1 benchmark scan | $2^{32}$ full encryptions, a constant-time filter per record, and a 16-round peel for each survivor |
+| Phase 1 postprocessing | About $2^{16}$ survivors; histogram grouping and output |
+| Sweep A, group size $n$ | Up to $n^2$ SAT instances, each checking at most 100 models in the current code |
+| Sweep A, all false groups | About $2^{16}(2-e^{-1})\approx2^{16.7}$ instances under the Poisson(1) bin model; SAT cost is instance-dependent |
+| Sweep B, singleton group | $2^{16}$ constructive completions plus verification |
+| Sweep B, conditional on a true singleton | About $2^{16}(1+2^{15}/e)\approx2^{29.6}$ completions when the true singleton is uniformly placed among false singletons |
 
-## Empirical Validation
+Completion counts are not full-encryption counts: each completion reconstructs 48 rounds and must also be verified. The CPU fallback encrypts at least the first verification plaintext for each tested candidate. GPU prefiltering changes execution cost, not the candidate-space definition.
 
-Two current benchmark snapshots from the repository match the theory well:
+The benchmark driver imposes a two-hour Phase 1 timeout and a one-hour Phase 2 timeout. A timed-out run is not an exhaustive experiment.
 
-- **Phase 1 only, H100 GPU, 100 random keys:** observed presence rate $85/100 = 85.0\%$, close to the heuristic prediction $1 - e^{-15/8} \approx 84.7\%$.
-- **End to end, H100 GPU Phase 1 + CPU Phase 2, 100 random keys:** observed recovery rate $85/100 = 85.0\%$, with the only failures being the 15 `votes_true = 0` cases.
+## Recorded Validation
 
-This is exactly the pattern predicted by the analysis above: once a true fixed point exists, the current exhaustive Phase 2 recovers the key. In the full 100-key run, 74 successful recoveries finished in Sweep A and 11 in Sweep B, and the successful phase~2 times had mean 7.6 seconds, median 3.1 seconds, and maximum 27.9 seconds.
+The committed [CSV](../../benchmarks/fixedpoint_benchmark.csv), [summary](../../benchmarks/fixedpoint_benchmark.txt), and [hardware record](../../benchmarks/gpu_env.txt) describe 100 keys generated with seed 42, using RTX PRO 6000 Blackwell GPU Phase 1 and 192 CPU workers for Phase 2:
+
+- 85 keys had a true Phase 1 signal; all 85 were recovered.
+- The 15 failures were precisely the keys with no true fixed point.
+- 74 recoveries finished in Sweep A and 11 in Sweep B.
+- Successful Phase 2 times had mean 6.0 seconds, median 3.3 seconds, and maximum 17.7 seconds.
+- Successful `total_time` had mean 6.2 seconds and median 3.5 seconds.
+
+`total_time` adds the reported Phase 1 scan time to Phase 2 process wall time; it excludes Phase 1 setup/output overhead and codebook acquisition. Scan times are printed to one decimal place, so `0.0` is a rounded value. Earlier H100 scalar-kernel measurements in the README are historical, not the current benchmark platform.

@@ -1,13 +1,17 @@
 # Fixed-Point Attack on KeeLoq
 
-A key recovery attack on full 528 round KeeLoq that uses fixed points of the round function.
+A key recovery attack on full 528-round KeeLoq that uses fixed points of the eighth iterate of its 64-round core.
+
+The attack assumes the complete codebook of $2^{32}$ plaintext–ciphertext pairs. The supplied scanners generate that codebook from a known test key; they are benchmark programs, not device-acquisition tools. Reported timings exclude acquisition from a real device.
+
+Unless stated otherwise, run the commands below from `attacks/fixedpoint/`.
 
 ## Overview
 
 KeeLoq uses a 64 bit key, a 32 bit block, and 528 encryption rounds. The key schedule has period 64, so $E_{528} = E_{16} \circ (E_{64})^8$. If a plaintext $S$ is a fixed point of $(E_{64})^8$, then $E_{528}(K, S) = E_{16}(K, S)$. This lets us split key recovery into two phases:
 
-- **Phase 1 (C/CUDA):** Scan all $2^{32}$ plaintexts, filter candidates with a 16 bit condition on the ciphertext, and peel 16 rounds to recover the lower 16 key bits $k[0..15]$ by majority vote. This runs on CPU or GPU.
-- **Phase 2 (Python + helpers):** Recover the remaining 48 key bits with exhaustive directed pair SAT for groups with $n \geq 2$ and exact singleton recovery for groups with $n = 1$.
+- **Phase 1 (C/CUDA):** Scan all $2^{32}$ plaintexts, filter candidates with a 16-bit condition on the ciphertext, and peel 16 rounds to derive candidates for $k[0..15]$. Vote counts rank the groups; the true group need not rank first. This runs on CPU or GPU.
+- **Phase 2 (Python + helpers):** Recover the remaining 48 key bits with a directed-pair SAT sweep for groups with $n \geq 2$ and exact singleton recovery for groups with $n = 1$.
 
 ## Requirements
 
@@ -15,8 +19,9 @@ KeeLoq uses a 64 bit key, a 32 bit block, and 528 encryption rounds. The key sch
 
 - C compiler with C11 support (GCC or Clang)
 - POSIX threads (pthreads)
-- Python 3.8+
+- Python 3 (use a version supported by the installed `python-sat` package)
 - Make
+- NVIDIA GPU and CUDA Toolkit (`nvcc`) for the optional GPU paths
 
 ### Ubuntu / Server Setup
 
@@ -37,11 +42,7 @@ pip install python-sat
 
 The Makefile auto-detects `venv/bin/python` if present. Override with `VENV=myenv`.
 
-Optionally install CryptoMiniSat as an alternative solver:
-
-```bash
-pip install pycryptosat
-```
+The current recovery path uses PySAT's `cadical153` backend. Although the CLI accepts `--solver cryptominisat`, `try_pair_sat()` currently selects CaDiCaL internally; that option does not switch the recovery backend. `pycryptosat` is not required for this path.
 
 ## Quick Start
 
@@ -108,7 +109,7 @@ Any fixed point of $(E_{64})^8$ must belong to a 1-cycle, 2-cycle, 4-cycle, or 8
 
 > **Heuristic assumption.** The analysis below models $E_{64}$ as a uniform random permutation on $2^{32}$ elements. This is standard in cryptanalysis. It is not a proven property of KeeLoq. The benchmarks below match the main predictions of this model.
 
-Model $(E_{64})^8$ as a random permutation on $2^{32}$ elements. Its fixed points are exactly the elements in 1-cycles, 2-cycles, 4-cycles, and 8-cycles of $E_{64}$. Random permutation theory says that the number of $d$-cycles is about $\operatorname{Poisson}(1/d)$ for $d \ll N$, and each $d$-cycle contributes $d$ fixed points. So the total number of true fixed points is:
+Model $F=E_{64}$ as a random permutation on $2^{32}$ elements, then study $F^8$; its eighth power is not itself uniformly distributed over permutations. Its fixed points are exactly the elements in 1-cycles, 2-cycles, 4-cycles, and 8-cycles of $F$. The small-cycle counts are approximately independent $\operatorname{Poisson}(1/d)$ variables, and each $d$-cycle contributes $d$ fixed points. So the total number of true fixed points is approximated by:
 
 $$\text{FP}_{\text{true}} = 1 \cdot \operatorname{Poi}(1) + 2 \cdot \operatorname{Poi}(\tfrac{1}{2}) + 4 \cdot \operatorname{Poi}(\tfrac{1}{4}) + 8 \cdot \operatorname{Poi}(\tfrac{1}{8})$$
 
@@ -183,7 +184,7 @@ for i = 0 to 15:
     state = (state >> 1) | (fb << 31)         # advance to next round
 ```
 
-This recovers the 16-bit candidate $k[0..15]$ using only XOR operations, without brute force.
+This recovers the 16-bit candidate $k[0..15]$ using NLF evaluations, shifts, and XOR operations, without enumerating key guesses.
 
 ### How Voting Works
 
@@ -193,21 +194,21 @@ After peeling, we have about $2^{16}$ survivors, each with a peeled 16-bit value
 
 **Why voting works:**
 
-- **True fixed points** (usually 2 to 8): All come from the same key. Peeling 16 rounds from any true fixed point gives the same correct $k[0..15]$, so all of them vote for one bin.
+- **True fixed points:** All come from the same key. Peeling 16 rounds from any true fixed point gives the same correct $k[0..15]$, so all of them vote for one bin. The modeled mean count is 4, but a key may have none or only one.
 
-- **False positives** (about $2^{16}$): These pass the filter $C[0..15] = S[16..31]$ by chance, but they are not true fixed points. Their peeled "key bits" are effectively random, so each one votes for a random bin.
+- **False positives** (about $2^{16}$): These pass the filter but are not true fixed points. Their peeled values populate the wrong-key bins. They cannot enter the true bin: matching $E_{16}(K,S)=E_{528}(K,S)$ with the correct low key implies $F^8(S)=S$.
 
 **The competition:** About $2^{16}$ false positives spread across $2^{16}$ bins, so the expected count per bin is about 1, following $\operatorname{Poisson}(1)$. The largest false bin usually gets 7 to 9 votes.
 
-If the true $k[0..15]$ receives $\geq 8$ votes (from true fixed points), it wins rank #1. If it receives fewer votes (e.g., only 2 true fixed points), it may be buried below false-positive bins with higher counts.
+Eight or more true votes usually place the true group near rank #1, but this is not a guarantee. A false bin can tie or exceed that count. With fewer votes, the true group may be buried below false-positive bins.
 
 **Output:** Phase 1 outputs **all** $k[0..15]$ candidates, sorted by vote count, not just the top one. This lets Phase 2 find the true group even when it is not ranked #1. Each candidate value becomes a group, and the survivors with that peeled value become that group's members.
 
 ### Rank Distribution: Why Top-1 Is Hard
 
-The false-positive survivors each peel to a random $k_{16}$ value, so the false vote counts across the $2^{16}$ bins follow $\operatorname{Poisson}(1)$. The number of false bins with $\geq k$ votes is:
+The false-positive survivors each peel to a random $k_{16}$ value, so wrong-bin vote counts are modeled approximately by $\operatorname{Poisson}(1)$. The number of false bins with $\geq k$ votes is:
 
-| Votes $\geq k$ | $P(\operatorname{Poi}(1) \geq k)$ | Expected false bins (out of $2^{16}$) | Implied rank of true $k_{16}$ if it has exactly $k$ votes |
+| Votes $\geq k$ | $P(\operatorname{Poi}(1) \geq k)$ | Expected false bins (out of $2^{16}$) | Approximate rank upper estimate, counting all ties ahead |
 |:-:|:-:|:-:|:-:|
 | 5 | 0.00366 | $\sim 240$ | $\sim 240$ |
 | 6 | 0.000594 | $\sim 39$ | $\sim 40$ |
@@ -217,7 +218,7 @@ The false-positive survivors each peel to a random $k_{16}$ value, so the false 
 
 So the true $k_{16}$ usually needs about 8 to 9 votes to reach rank #1. Getting 8 or more true votes usually requires an 8-cycle of $E_{64}$, which has probability $1 - e^{-1/8} \approx 11.8\%$, plus help from shorter cycles. This matches the observed top-1 rate of about 20%.
 
-Similarly, rank $\leq 10$ needs $\geq 7$ votes, rank $\leq 100$ needs $\geq 6$, and rank $\leq 1{,}000$ needs $\geq 5$. The observed rates, 28%, 35%, and 53%, are consistent with those thresholds.
+Likewise, about 7, 6, and 5 votes tend to place the true bin within ranks 10, 100, and 1,000, respectively. These are approximate thresholds, not necessary conditions; ties and fluctuations affect rank. The observed rates were 28%, 35%, and 53%.
 
 ## GPU Parallelism (Phase 1)
 
@@ -229,28 +230,30 @@ A CUDA GPU organises work in three levels:
 
 | Level | What it is | Our mapping |
 |-------|-----------|-------------|
-| **Thread** | The smallest unit of execution. Each thread runs the same code on different data. | **1 thread = 1 plaintext.** Thread $i$ encrypts plaintext $i$ through all 528 rounds and checks the filter condition. |
+| **Thread** | One CUDA thread operates on bit planes stored in 32-bit words. | **1 thread = 32 plaintexts.** Thread $i$ processes plaintexts `start + 32*i + lane`, for lanes 0–31, through all 528 rounds. |
 | **Block** | A group of threads that run together on one streaming multiprocessor (SM). Threads in a block can share fast local memory and synchronise with each other. | A block contains `threads_per_block` threads (default 256). In our kernel, threads are independent, so we only use block-level grouping for hardware scheduling. |
-| **Grid** | The collection of all blocks for one kernel launch. The GPU distributes blocks across all available SMs. | The grid has $\lceil \text{chunk\_size} / \text{threads\_per\_block} \rceil$ blocks. With a chunk of $2^{26}$ plaintexts and 256 threads per block, the grid is $2^{26}/256 = 262{,}144$ blocks. |
+| **Grid** | The collection of all blocks for one kernel launch. | The grid has $\lceil \text{chunk\_size}/(32\,\text{threads\_per\_block})\rceil$ blocks. A $2^{26}$-plaintext chunk uses $2^{21}$ threads, or 8,192 blocks at 256 threads per block. |
 
-We do not launch all $2^{32}$ threads at once. The GPU has block-count limits, and very long kernels can trigger watchdog timeouts. Instead, the code uses chunks of $2^{26}$, about 67 million, plaintexts. That gives $2^{32} / 2^{26} = 64$ kernel launches. Between launches, the code copies the small survivor set back to the host and prints progress. This chunking is an implementation choice, not a cryptanalytic requirement.
+The code uses chunks of $2^{26}$ plaintexts, giving 64 launches for the full codebook. After each launch it copies the survivor set back to the host; it prints progress every $2^{29}$ processed plaintexts. Chunking bounds per-launch work and survivor storage.
 
 ### What Each Thread Does
 
 ```
 thread i:
-    1. pt = start + i                      // my plaintext
-    2. ct = KeeLoq_528(key, pt)            // full 528-round encryption
-    3. if ct[0..15] == pt[16..31]:          // fixed-point filter
-         k16 = peel_16_rounds(pt, ct)      // recover candidate k[0..15]
+    1. initialize bit planes for 32 plaintexts starting at start + 32*i
+    2. encrypt all 32 lanes together through 528 rounds
+    3. compute the 16-bit filter across all lanes
+    4. for each surviving lane:
+         reconstruct its pt and ct
+         k16 = peel_16_rounds(pt, ct)
          atomically append (pt, ct, k16) to the survivors list
 ```
 
-Step 3 fires for roughly 1 in $2^{16}$ plaintexts, so the atomic append is extremely rare and causes no contention.
+Roughly 1 in $2^{16}$ plaintexts survives, so atomic appends are sparse.
 
 ### After the GPU Finishes
 
-All survivors ($\sim 2^{16}$ of them) are copied back to the CPU, where a simple histogram vote over the `k16` values determines the best candidate. This host-side step is trivial compared to the scan.
+All survivors ($\sim 2^{16}$ of them) are grouped and ranked on the CPU, then written to `fixedpoint_data.txt`. These host operations and file I/O are separate from the GPU kernel work and can matter when scans are very fast.
 
 ### CLI Parameters
 
@@ -260,10 +263,10 @@ All survivors ($\sim 2^{16}$ of them) are copied back to the CPU, where a simple
 
 | Parameter | Default | Meaning |
 |-----------|---------|---------|
-| `threads_per_block` | 256 | Number of threads per block. Must be a multiple of 32 (warp size). Values between 128 and 512 are typical. Higher values give the GPU scheduler more flexibility; lower values use fewer registers per block, potentially allowing more blocks to run simultaneously. On an H100, try 256 or 512 and keep whichever is faster. |
+| `threads_per_block` | 256 | Threads per block for the direct binary invocation. Use a warp-aligned value supported by the GPU, such as 256, and measure before tuning. The Makefile instead passes `PHASE1_THREADS`, whose default inherits `THREADS=10`; set it explicitly for GPU runs. |
 | `key_hex` | `0x5CEC6701B79FD949` | The 64-bit target key in hex. In benchmark mode, the driver generates random keys and passes them here automatically. |
 
-### Typical Numbers on an H100
+### Current Kernel Geometry
 
 | Metric | Value |
 |--------|-------|
@@ -271,18 +274,18 @@ All survivors ($\sim 2^{16}$ of them) are copied back to the CPU, where a simple
 | Chunk size | $2^{26} = 67{,}108{,}864$ |
 | Kernel launches | 64 |
 | Threads per block | 256 to 512 |
-| Blocks per launch | $\sim 262{,}144$ |
+| Blocks per launch | 8,192 at 256 threads/block; 4,096 at 512 |
 | Survivors (total) | $\sim 65{,}536$ |
-| Scan time | A few seconds |
+| Scan time | Hardware-dependent; see the separately labeled benchmark snapshots below |
 
-## Phase 2: Exact Recovery of $k[16..63]$
+## Phase 2: Recovery of $k[16..63]$
 
 With $k[0..15]$ known, compute $M_{16} = E_{16}(k[0..15], S)$ for each candidate survivor. Phase 2 then recovers the remaining 48 key bits exactly. The implementation has two exhaustive sweeps:
 
-- **Sweep A (`n >= 2`)**: exhaustive directed-pair 48-round SAT.
+- **Sweep A (`n >= 2`)**: all directed target pairs, with capped 48-round SAT-model enumeration.
 - **Sweep B (`n = 1`)**: exhaustive singleton constructive recovery, optionally accelerated by an exact GPU prefilter.
 
-So Phase 2 does not rely on heuristic singleton budgets or fallback search passes. If a true Phase 1 group exists, Phase 2 will find the key.
+The singleton path enumerates every completion. Sweep A covers all target pairs, but its SAT-model enumeration is capped at 100 candidates per target pair; see the implementation limitation below.
 
 ### SAT Constraints by Cycle Type
 
@@ -312,12 +315,12 @@ $$
 
 for all $b,d \in \{0,\dots,n-1\}$. This exhaustive $n^2$ sweep covers 1-cycles, 2-cycles, 4-cycles, and 8-cycles uniformly.
 
-- If the group is false, all instances are UNSAT.
-- If the group is the true one and $n \geq 2$, the correct successor pair is guaranteed to appear, so recovery is certain.
+- False groups usually give UNSAT instances, but a satisfiable wrong hypothesis is possible. Every returned key is checked against the group's full-round pairs and up to 20 additional pairs sampled from the Phase 1 output.
+- For a true group with $n \geq 2$, the correct successor pair is guaranteed to appear. Recovery then requires the true key to be reached within that call's SAT-model budget.
 
 ### Sweep B: Exact Singleton Recovery for Groups with $n = 1$
 
-If Sweep A finds nothing, the true group must be a singleton. In that case the group corresponds to a 1-cycle and satisfies
+If Sweep A finds nothing, Sweep B processes all singleton groups. This also happens when there is no true fixed point at all. If a singleton is the true group, it corresponds to a 1-cycle and satisfies
 
 $$
 E_{48}(k[16..63], M_{16}) = S.
@@ -337,17 +340,19 @@ The implementation optionally accelerates Sweep B with a CUDA helper:
 
 This does **not** change the search space, so it does **not** reduce success probability. It is only a batching optimization for the singleton path.
 
-### Why Phase 2 Is Exact
+### Search Coverage and Implementation Limit
 
-The implementation is exhaustive in both cases:
+The theoretical exhaustive recovery procedure covers both cases:
 
-- **If the true group has $n \geq 2$**, Sweep A enumerates every directed successor pair and therefore must hit the correct one.
+- **If the true group has $n \geq 2$**, Sweep A enumerates every directed successor pair. Exhaustive SAT-model enumeration for the correct pair would include the true key.
 - **If the true group has $n = 1$**, Sweep B enumerates all $2^{16}$ singleton completions and therefore must hit the correct one.
 
-So once `votes_true > 0`, recovery succeeds. Under the random-permutation heuristic, the end-to-end success probability is therefore exactly the Phase 1 presence probability:
+**Current code limit:** `try_pair_sat(..., max_enum=100)` checks at most 100 SAT models per target pair. This is not an unconditional completeness guarantee for Sweep A, even though all 85 present keys were recovered in the recorded 100-key experiment. `benchmark.py` also imposes timeouts of two hours for Phase 1 and one hour for Phase 2.
+
+For the ideal exhaustive procedure, the small-cycle Poisson approximation gives the same end-to-end probability as Phase 1 presence:
 
 $$
-P(\text{success}) = 1 - e^{-15/8} \approx 84.7\%.
+P(\text{success}) \approx 1 - e^{-15/8} \approx 84.7\%.
 $$
 
 ## Benchmarks and Expected Behavior
@@ -362,7 +367,7 @@ The following histogram shows the distribution of `votes_true` (the number of Ph
 |:-:|:-:|:-:|:--|
 | 0 | 15 | 15% | No true fixed points; attack fails |
 | 1 | 11 | 11% | Single 1-cycle; buried deep in ranking |
-| 2 | 8 | 8% | Two 1-cycles or one 2-cycle + noise |
+| 2 | 8 | 8% | Two 1-cycles or one 2-cycle; no false votes enter the true bin |
 | 3 | 10 | 10% | |
 | 4 | 14 | 14% | |
 | 5 | 7 | 7% | |
@@ -393,17 +398,19 @@ For the 15 absent keys (`votes_true = 0`), the `votes_best` column is purely fro
 | 8 | 3 |
 | 9 | 1 |
 
-This confirms the theoretical maximum false-positive bin is typically **7** (median), occasionally 8 or 9. In the data, **every rank-1 key has `votes_true >= 8`**, and **every key with `votes_true = 7` has rank 2 to 4**. The threshold predicted by the Poisson(1) bin model is sharp.
+The maximum false-bin count was typically **7** in this sample, occasionally 8 or 9. In these data, **every rank-1 key has `votes_true >= 8`**, and **every key with `votes_true = 7` has rank 2 to 4**. These are empirical observations, not universal thresholds.
 
-### Benchmark Snapshot: Phase 1 Only (H100 scalar kernel, 100 Keys, seed=42)
+### Historical Benchmark: Phase 1 Only (H100 scalar kernel, 100 Keys, seed=42)
+
+This snapshot used an older scalar implementation; the current source launches the bit-sliced kernel. It is retained for historical context, not as a result reproducible by selecting a scalar CLI mode.
 
 H100 GPU, scalar kernel, `THREADS=512`, `BENCH_KEYS=100`, `BENCH_SEED=42`, `BENCH_PHASE1_ONLY=1`:
 
 | Metric | Observed | Theory | Match |
 |--------|----------|--------|-------|
 | Survivors per key | 65,525 (mean) | $2^{16} = 65{,}536$ | $\checkmark$ (99.98%) |
-| True $k_{16}$ votes (mean) | 4.5 | $\sim 5$ (4 FP + 1 noise) | $\checkmark$ |
-| True $k_{16}$ votes (median) | 4.0 | $\sim 4$ | $\checkmark$ |
+| True $k_{16}$ votes (mean) | 4.5 | 4 (true fixed points only) | consistent with sampling variation |
+| True $k_{16}$ votes (median) | 4.0 | 3 in the Poisson-cycle model | finite-sample statistic |
 | **Presence** (`votes > 0`) | **85/100 (85.0%)** | $1 - e^{-15/8} \approx 84.7\%$ | $\checkmark$ |
 | Absence (`votes = 0`) | 15/100 (15.0%) | $e^{-15/8} \approx 15.3\%$ | $\checkmark$ |
 | Top-1 (rank = #1) | 20/100 (20.0%) | $\sim 15$ to $20\%$ | $\checkmark$ |
@@ -447,11 +454,10 @@ Environment for this benchmark:
 - Kernel: `Linux 6.8.0-49-generic x86_64 GNU/Linux`
 - Aggregate benchmark wall time: 174 s for all 100 keys
 
-The scan is deterministic: every key scans the same $2^{32}$ plaintexts, so per-key time varies
-only with clock behaviour. The presence rate, absence rate, and vote distribution all land within
+Every key scans the same $2^{32}$ plaintexts, but clocks, scheduling, survivor handling, and timing precision can affect reported time. The presence rate, absence rate, and vote distribution all land within
 sampling error of the random-permutation model, which is the point of the check.
 
-### Benchmark Snapshot: End-to-End (H100 GPU, 100 Keys, seed=42)
+### Historical Benchmark: End-to-End (H100 GPU, 100 Keys, seed=42)
 
 H100 GPU Phase 1 (scalar kernel), CPU Phase 2, `BENCH_KEYS=100`, `BENCH_PHASE1_BACKEND=gpu`, `BENCH_PHASE1_THREADS=256`, `BENCH_PHASE2_THREADS=32`:
 
@@ -472,7 +478,7 @@ Among the 85 successful recoveries, **74** finished in Sweep A and **11** finish
 ### Benchmark Snapshot: End-to-End (100 keys, seed=42)
 
 GPU Phase 1 (bit-slice kernel) plus CPU Phase 2, on an NVIDIA RTX PRO 6000 Blackwell Workstation
-Edition (`sm_120`, 188 SMs) with a 192-core host. `BENCH_KEYS=100`, `BENCH_SEED=42`,
+Edition (`sm_120`, 188 SMs) with 192 CPU workers. `BENCH_KEYS=100`, `BENCH_SEED=42`,
 `BENCH_PHASE1_BACKEND=gpu`, `BENCH_PHASE1_THREADS=256`, `BENCH_PHASE2_THREADS=192`,
 solver `cadical`:
 
@@ -494,6 +500,8 @@ solver `cadical`:
 Runtime is dominated by Phase 2, which is CPU SAT work: Phase 1 contributes under 0.05 s of a
 6.2 s successful run, so the host core count matters more than the GPU for end-to-end time.
 
+The committed [per-key CSV](../../benchmarks/fixedpoint_benchmark.csv), [summary](../../benchmarks/fixedpoint_benchmark.txt), and [hardware record](../../benchmarks/gpu_env.txt) document this run. Phase 1 console times are rounded to 0.1 seconds, so `0.0` means below the reporting resolution, not zero work. The benchmark's `total_time` is the rounded scan time plus Phase 2 process wall time; it excludes Phase 1 setup/output overhead and real-world codebook acquisition. The 947-second aggregate below covers the whole benchmark invocation.
+
 This matches the theoretical success model. Under the random-permutation heuristic, expected success
 is $1 - e^{-15/8} \approx 84.7\%$. The observed result, $85/100 = 85.0\%$, differs by only $0.3$
 percentage points (about $0.08\sigma$ for $n=100$), which is fully consistent with sampling noise.
@@ -503,8 +511,10 @@ Reproduce with:
 
 ```bash
 make benchmark THREADS=256 BENCH_KEYS=100 BENCH_SEED=42 \
-     BENCH_PHASE1_BACKEND=gpu BENCH_PHASE1_THREADS=256 BENCH_PHASE2_THREADS=$(nproc)
+     BENCH_PHASE1_BACKEND=gpu BENCH_PHASE1_THREADS=256 BENCH_PHASE2_THREADS=192
 ```
+
+Use 192 workers only on a host with that allocation; choose an appropriate count elsewhere and report it with the results.
 
 Reported summary line for this run: `Benchmark completed in 947s (15.8m)`.
 
@@ -513,11 +523,11 @@ Reported summary line for this run: `Benchmark completed in 947s (15.8m)`.
 | GPU | Kernel | Scan time / key | Throughput |
 |-----|--------|-----------------|------------|
 | H100 | scalar (1 pt/thread) | **2.4 s** | ~1,789 M enc/s |
-| RTX PRO 6000 Blackwell | bit-slice (32 pts/thread) | **0.0 to 0.3 s**, median 0.1 s | >= ~43,000 M enc/s at the median |
+| RTX PRO 6000 Blackwell | bit-slice (32 pts/thread) | **0.0 to 0.3 s**, median 0.1 s | ~43,000 M enc/s from the rounded median |
 
-> The bit-slice kernel processes 32 plaintexts simultaneously per thread using 32-lane bit-plane arithmetic, which provides roughly a 32× throughput multiplier over the scalar path on the same SM count (net gain after register-pressure tradeoff is typically closer to 20–28×).
+These runs differ in both GPU hardware and implementation, so they do not isolate a bit-slicing speedup. Processing 32 lanes together does not imply a 32× wall-clock gain. The rounded scan times also limit the precision of derived throughput.
 
-### Slowest Successful Singleton Cases in the 100-Key Benchmark
+### Historical H100 Singleton Cases
 
 The slowest successful cases in this 100-key H100 benchmark were all singleton recoveries. The top examples were:
 
@@ -552,7 +562,7 @@ flowchart LR
 ### Failure Modes
 
 - **votes=0:** No true fixed points survived the filter. Predicted to occur for about $15.3\%$ of keys ($e^{-15/8}$). The attack cannot recover the key in these cases.
-- **votes>0:** The implementation is exhaustive and recovers the key. The remaining variation is runtime, not success probability.
+- **votes>0:** All 85 present keys were recovered in the recorded sample. The theoretical procedure covers them, but the current SAT-model cap and benchmark timeouts prevent an unconditional implementation guarantee.
 
 ## File Structure
 
@@ -565,7 +575,7 @@ flowchart LR
 | `singleton_gpu_prefilter.cu` | CUDA helper for exact singleton prefiltering |
 | `benchmark.py` | Multi-key benchmark driver (produces CSV + summary) |
 | `Makefile` | Build and run the full attack pipeline |
-| `keeloq.c` / `keeloq.h` | KeeLoq encryption/decryption (used by test programs) |
+| `keeloq.c` / `keeloq.h` | Reference cipher used by the native singleton helper |
 
 
 ## Usage
@@ -594,10 +604,11 @@ make attack KEY=0x5CEC6701B79FD949 PHASE1_BACKEND=gpu PHASE1_THREADS=512 PHASE2_
 Example SLURM allocation command used on a university GPU server:
 
 ```bash
-srun -p fat_gpu --account=leandgbm_0000 -N 1 --gpus=1 --gpus-per-node=1 --cpus-per-gpu=12 --time=30:00 --pty bash6
+srun --partition=YOUR_GPU_PARTITION --account=YOUR_ACCOUNT \
+     --nodes=1 --gpus-per-node=1 --cpus-per-task=56 --time=00:30:00 --pty bash
 ```
 
-This runs:
+Replace the allocation placeholders with your site's values. `srun` opens a shell; run the hybrid `make attack` command inside it. That command runs:
 - Phase 1 on GPU (`PHASE1_BACKEND=gpu`)
 - Phase 2 on CPU (`PHASE2_THREADS=56` workers)
 
@@ -607,8 +618,10 @@ the Makefile aborts early with a clear error instead of silently falling back.
 ### Random Key
 
 ```bash
-make random THREADS=56
+make random KEY=random THREADS=56
 ```
+
+The current Makefile initializes `KEY` to a hexadecimal default, so bare `make random` reuses that key. `KEY=random` triggers its random-key generation; an explicit `KEY=0x...` uses that value.
 
 ### Run Each Phase Separately
 
@@ -687,11 +700,13 @@ In `BENCH_PHASE1_ONLY=1` mode, benchmark "success" is defined as `votes_true > 0
 (the true `k16` appears in Phase 1 candidate groups). The summary also reports
 rank buckets (`rank<=10`, `rank<=100`, `rank<=1000`) for deeper analysis.
 
-### Unit Tests
+### Test Target
 
 ```bash
 make test
 ```
+
+This target is a placeholder and prints `No unit tests configured`; it does not validate the attack. Use a documented full-key experiment or benchmark for validation. A fixed-point failure on a key with no true signal is expected.
 
 ### Clean
 
@@ -707,22 +722,22 @@ make clean
 | `THREADS` | `10` | Default thread setting for both phases |
 | `PHASE1_THREADS` | `THREADS` | Phase 1 CPU threads or GPU threads-per-block |
 | `PHASE2_THREADS` | `THREADS` | Phase 2 worker count |
-| `SOLVER` | `cadical` | SAT solver: `cadical` or `cryptominisat` |
+| `SOLVER` | `cadical` | CLI label; the current directed-pair implementation always uses PySAT `cadical153` |
 | `BENCH_KEYS` | `100` | Number of random keys for benchmark |
 | `BENCH_SEED` | `42` | RNG seed for benchmark key generation |
 | `BENCH_PHASE1_ONLY` | `0` | If `1`, benchmark only Phase 1 and skip all Phase 2 work |
 | `BENCH_PHASE1_BACKEND` | `cpu` | Phase 1 backend for benchmark: `cpu` or `gpu` |
+| `BENCH_PHASE1_THREADS` | `THREADS` | Benchmark CPU threads or GPU threads per block |
+| `BENCH_PHASE2_THREADS` | `THREADS` | Benchmark Phase 2 worker count |
 | `BENCH_SKIP_PHASE2_IF_ABSENT` | `0` | If `1`, benchmark skips Phase 2 when `votes_true = 0` |
 | `PHASE1_BACKEND` | `cpu` | Phase 1 backend for `make phase1` / `make attack`: `cpu` or `gpu` |
 
-### Choosing a SAT Solver
+### SAT Backend
 
-- **cadical** (default): CaDiCaL via PySAT. Install with `pip install python-sat`.
-- **cryptominisat**: CryptoMiniSat via `pycryptosat`. Install with `pip install pycryptosat`.
+Use **cadical** for the current recovery path. Install with `python -m pip install python-sat`. The accepted `cryptominisat` option is not wired to the active directed-pair solver.
 
 ```bash
-make attack SOLVER=cadical           # default
-make attack SOLVER=cryptominisat     # alternative
+make attack SOLVER=cadical
 ```
 
 ## Google Cloud Setup

@@ -2,6 +2,8 @@
 
 High performance GPU brute force attack on full 528 round KeeLoq.
 
+Run the commands below from `attacks/bruteforce/`. Benchmark mode generates synthetic pairs from a known target key; fixed-bit experiments assume the specified secret bits are already known.
+
 ## Build
 
 This folder requires the NVIDIA CUDA toolkit (`nvcc`).
@@ -9,10 +11,10 @@ This folder requires the NVIDIA CUDA toolkit (`nvcc`).
 ```bash
 make            # auto-detects GPU architecture
 # or manually:
-nvcc -O3 --use_fast_math -arch=sm_120 -o keeloq_bf keeloq_bruteforce.cu
+nvcc -O3 -std=c++17 --use_fast_math -arch=sm_120 -o keeloq_bf keeloq_bruteforce.cu
 ```
 
-If you use a non RTX 50xx GPU, set `-arch` to the correct architecture for your card.
+`sm_120` applies to the measured RTX PRO 6000 Blackwell Workstation Edition and RTX 50-series cards. For other devices, select the appropriate target from NVIDIA's [compute-capability list](https://developer.nvidia.com/cuda/gpus). With Make, override detection using, for example, `make GPU_ARCH=90` for an H100/H200. Rebuild with `make clean` or `make -B` after changing compilation flags.
 
 ## Quick Start
 
@@ -38,9 +40,11 @@ on the bit-slice kernel: `__launch_bounds__` takes precedence over it. Change
 Run against explicit plaintext/ciphertext pairs:
 
 ```bash
-./keeloq_bf --pt0 0xA3B1799D --ct0 0xBC49AC6D \
-            --pt1 0x46685257 --ct1 0x92CA7761
+./keeloq_bf --pt0 0xF741E2DB --ct0 0xE44F4CDF \
+            --pt1 0x0CA69B92 --ct1 0xA6AC0EA2
 ```
+
+This explicit-pair command searches the full key space and is not a quick test. The benchmark commands above use a smaller space.
 
 ## Usage
 
@@ -78,8 +82,8 @@ Options:
 
 **Full 2⁶⁴ brute-force with known P/C pairs**:
 ```bash
-./keeloq_bf --pt0 0xA3B1799D --ct0 0xBC49AC6D \
-            --pt1 0x46685257 --ct1 0x92CA7761
+./keeloq_bf --pt0 0xF741E2DB --ct0 0xE44F4CDF \
+            --pt1 0x0CA69B92 --ct1 0xA6AC0EA2
 ```
 
 **Reduced-round attack (e.g., 128 rounds)**:
@@ -89,7 +93,7 @@ Options:
 
 ## Strategy
 
-The attack uses only **2 plaintext ciphertext pairs**. That is the theoretical minimum needed to identify a 64 bit key in a 32 bit block cipher. Each pair gives 32 bits of filtering, so two pairs give 64 bits.
+The program filters candidates using **two plaintext–ciphertext pairs**. Two distinct pairs do not guarantee a unique 64-bit key: under an ideal-cipher heuristic, about one wrong key is expected to survive alongside the true key in the full key space. The program stops after a kernel chunk reports a match and prints the first stored matching key; it does not enumerate every match or accept a third pair. Verify that candidate against additional independent data before treating it as the original key.
 
 The kernel uses **waterfall filtering**:
 
@@ -100,7 +104,7 @@ This makes the effective cost about **1.0 encryption per candidate** instead of 
 
 ### GPU Optimisations
 
-- **Two kernel paths**: if the free key bits are contiguous, for example with `--fix-low` or a full $2^{64}$ search, a fast path kernel builds the candidate key with one `shift+OR`. For arbitrary `--fix-mask` patterns, a generic kernel uses a per thread index array.
+- **Three kernel paths**: the bit-sliced path requires 528 rounds, contiguous free key bits, and at least five free bits. Other contiguous cases use the scalar fast path; noncontiguous `--fix-mask` patterns use the generic scalar path.
 - **Bit-slice x32**: each thread carries 32 candidate keys as bit planes in `uint32_t` lanes, so one sequence of word-level Boolean instructions advances 32 keys through a round at once. With the inner loop, one thread covers $2^8 \times 32 = 8192$ consecutive keys.
 - **Register resident state**: the 32 state planes and the 64 key planes stay in registers; the plaintext/ciphertext pairs are held in registers too.
 - **NLF in 6 operations**: the KeeLoq NLF satisfies $\mathsf{NLF}(e,d,c,b,a) = \mathsf{NLF}(e,0,c \oplus d, b \oplus d, a \oplus d)$, so $d$ only complements the other inputs. That collapses the generic $(e,d)$ multiplexer tree to 3 XOR plus 3 three-input logic ops, evaluated lane-wise from the constant `0x3A5C742E` with no LUT in memory.
@@ -188,7 +192,7 @@ Worst-case GPU count for target wall-clock time `H` hours:
 | 168 hours (1 week) | 173 |
 | 720 hours (30 days) | 41 |
 
-Expected-time counts are about half of the table above.
+Expected-time counts are about half of the table above. These are estimates for reaching the true key's position with sufficient verification data, not a guarantee that the program's first two-pair match is that key. The executable selects one GPU with `--device`; cluster figures assume an external partitioning scheme and do not describe built-in multi-GPU orchestration.
 
 ### Reference Times For Fixed GPU Counts
 
@@ -229,4 +233,4 @@ Important scope notes:
   ```
   0x5CEC6701B79FD949
   ```
-- Exit code 0 = key found, 1 = not found or error.
+- Exit code 0 = at least one two-pair matching candidate found, 1 = not found or error. A zero exit status alone does not prove unique recovery of the original key.

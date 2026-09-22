@@ -31,8 +31,12 @@ If you only care about the core workflow, the two important files are `keeloq_mo
 Install the dependency with:
 
 ```bash
-pip install python-sat
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install python-sat
 ```
+
+Run these setup commands and the Python examples from the repository root. `gen_nlf_mpt.py` uses only the standard library. The local Makefile prefers `../../venv/bin/python` if it exists and otherwise uses `python3` from the active environment; `VENV=../../.venv` selects the environment above explicitly.
 
 ### C
 
@@ -48,6 +52,8 @@ python attacks/cube/keeloq_monomial.py -r 32 -c 0,1,2,3
 ```
 
 This reports all output bits that are proven key-independent for that 4-bit cube.
+
+The CLI calls them `BALANCED (key-independent)`, but its SAT query proves **key-independence of the cube sum**, not necessarily a zero sum. The model fixes all non-cube plaintext bits to zero; it does not prove the same result for arbitrary nonzero assignments outside the cube.
 
 ### 2. Test one cube/output-bit pair
 
@@ -161,6 +167,8 @@ Then the solver answers:
 
 In reduced-round settings one can also restrict this cardinality constraint to only the key bits that are actually used in the analyzed rounds. This is exactly the kind of upper-bound test implemented in SAT-based degree or linearity classification: `UNSAT` proves absence of higher-degree key dependence, while `SAT` only shows that such dependence is not ruled out by the trail model.
 
+The current `make_solver()` implements only the $\sum_i k_i\geq1$ query. The $\geq2$ linearity test describes an extension of the method, not an available CLI mode.
+
 The helper methods in `keeloq_monomial.py` use this to:
 
 - test one cube/output-bit pair
@@ -271,7 +279,11 @@ Given a round count and a list of cube bit positions, it:
 
 The code parallelizes the cube enumeration across CPU cores with pthreads.
 
+All plaintext bits outside the cube are zero. `KEY_INDEPENDENT` in the C output means constant across the sampled keys; that empirical result alone is not a proof for every key. Likewise, `BALANCED` means zero for all keys tested in that run.
+
 `verify_dim31.py` is only a convenience wrapper for the special case of dimension-31 cubes. It compiles the C verifier if needed, runs it, and compares the result against the SAT prediction. It is useful for regression checks, but it is not part of the minimal workflow.
+
+A dimension-31 run evaluates $2^{31}$ plaintexts per key and round count and can be expensive. The wrapper's default timeout is 1,200 seconds per empirical round test; use the 4-bit quick-start cube for a smoke test.
 
 ## Local Makefile
 

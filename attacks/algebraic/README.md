@@ -10,6 +10,8 @@ Install the full local Python environment:
 
 ```bash
 cd attacks/algebraic
+python3 -m venv venv
+source venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
@@ -28,11 +30,10 @@ Notes:
 
 ## Quick Start
 
-Basic reduced-round SAT solve:
+Run the following commands from `attacks/algebraic/` with the environment active. The default single-pair instance is underconstrained; use two pairs for a more useful recovery smoke test:
 
 ```bash
-cd attacks/algebraic
-python sat_solver.py --rounds 64 --pairs 1 --solver cadical
+python sat_solver.py --rounds 64 --pairs 2 --solver cadical --max-enum 100
 ```
 
 Controlled SAT benchmark with correct fixed bits:
@@ -104,6 +105,8 @@ What is possible, but should be read with care:
 - Those runs are useful for stress tests, clause count studies, and experiments with guessed variables or fixed bits.
 - They are not evidence of a practical generic direct algebraic attack on full KeeLoq.
 
+All examples generate synthetic data from `--key`. `--fixed-source correct` and `--guess-source correct` supply true secret information for controlled experiments; their timings exclude the cost of discovering those values. Slide mode also constructs a slid pair using the test key rather than searching for one in acquired data.
+
 ## SAT Workflow
 
 The usual SAT workflow is:
@@ -144,6 +147,7 @@ python sat_solver.py --rounds 160 --pairs 2 --solver cadical --guess-vars "b_0_6
 Load guessed variables from a file:
 
 ```bash
+printf '%s\n' b_0_67 b_1_67 b_0_140 b_1_140 > guesses.txt
 python sat_solver.py --rounds 160 --pairs 2 --solver cadical --guess-vars-file guesses.txt --guess-source correct
 ```
 
@@ -203,11 +207,11 @@ One plaintext ciphertext pair does not uniquely determine a 64 bit KeeLoq key. S
 - a key that satisfies the solving pair set
 - a key that also survives verification on independent holdout pairs
 
-Heuristically, with `n` pairs and `b` fixed key bits, the residual solution count is about $2^{64 - b - 32n}$.
+With `n` distinct pairs and `b` correctly fixed key bits, an ideal-cipher filtering heuristic predicts about $2^{64-b-32n}$ **wrong** surviving keys, in addition to the true key. This is not a reliable count for every reduced-round instance: for fewer than 64 rounds some key bits are unused, and output constraints can be dependent.
 
 Example:
 
-- `--pairs 1 --fixed-bits 32` gives a heuristic residual space near $2^0 = 1$ on average.
+- `--pairs 1 --fixed-bits 32 --fixed-source correct` gives about one wrong candidate in addition to the true key under that heuristic.
 - That does not guarantee uniqueness for a concrete instance. Collisions and spurious first solutions can occur.
 
 When the first SAT solution fails holdout verification, the solver adds a blocking clause and continues enumerating, up to `--max-enum` additional models.
@@ -219,11 +223,13 @@ When the first SAT solution fails holdout verification, the solver adds a blocki
 Mechanism:
 
 - the solver picks `ceil(log2(N))` unfixed key bits
-- each worker receives one assignment pattern for those bits
+- the $2^{\lceil\log_2 N\rceil}$ partitions are scheduled across up to `N` worker processes (fewer partitions if there are not enough unfixed bits)
 - each worker builds its own SAT solver on the same CNF and enumerates only inside its partition
 - workers stop early when one of them finds a holdout verified key
 
 This improves throughput on ambiguous instances, but it does not make an underconstrained problem uniquely determined.
+
+The parallel budget is rounded per partition: `max(1, max_enum // num_partitions)` models per partition. It may differ from the requested `--max-enum`; for example, 100 requested models over 16 partitions gives a budget of 96. Partition searches rebuild the instance and can revisit the initial candidate.
 
 ### Backbone and Pairwise-Affine Modes
 
@@ -233,6 +239,8 @@ These modes try to extract structure from the SAT instance before brute force st
 - `--pairwise-affine` checks whether any exact relations `k_i XOR k_j = c` hold across all satisfying assignments.
 
 Use them as diagnostics and as possible search space reducers. They are exact analyses of the SAT instance, not heuristics, but in weakly constrained regimes they may return no useful structure.
+
+Use a PySAT backend (`cadical`, `glucose`, or `minisat`) for these diagnostics. They are not enabled on the CryptoMiniSat path.
 
 Example:
 
@@ -327,6 +335,8 @@ Useful options:
 
 The Groebner workflow is mainly for smaller reduced round systems. Treat `--slide528` the same way as in the SAT solver: it is a decomposition into 64 round components, not a direct 528 round Groebner attack.
 
+At 32 rounds only the first 32 key bits are used; recovering a full 64-bit key from those instances is not possible. The solver reports key bits it can extract from the basis. `--use-polygen` selects a Python implementation of the polygen-style encoding; it does not execute or parse the C generator.
+
 ## Equation Generator
 
 Build the local equation generator:
@@ -364,6 +374,8 @@ make setup-python  # install Python dependencies from requirements.txt
 make benchmark-cpu # benchmark CPU-only SAT modes
 make clean         # remove local build artifacts
 ```
+
+The local Makefile defaults to `ROUNDS=64`, `PAIRS=1`, and `SOLVER=cryptominisat`. Thus `make groebner` uses 64 rounds, unlike the Python script's 32-round default. For the small examples above, use `make sat ROUNDS=64 PAIRS=2 SOLVER=cadical` and `make groebner ROUNDS=32 PAIRS=2`. The C generator prompts for rounds and pair count in `polygen`/`polygen-sym` mode; the Makefile's `ROUNDS` and `PAIRS` variables apply only to the Python targets. Slide modes generate the two fixed 64-round constraints.
 
 ## CPU-Only SAT Benchmark
 
