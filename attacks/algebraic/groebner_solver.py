@@ -101,7 +101,8 @@ def generate_polygen_equations(
     plaintexts: List[int],
     ciphertexts: List[int],
     rounds: int,
-    project_root: str = None
+    project_root: str = None,
+    key_offsets: List[int] = None
 ) -> List[str]:
     """
     Generate KeeLoq equations using the C polygen implementation.
@@ -117,16 +118,20 @@ def generate_polygen_equations(
         ciphertexts: List of ciphertext values
         rounds: Number of rounds
         project_root: Path to KeeLoq project root (for finding the C binary)
+        key_offsets: List of key schedule offsets per pair (default: all 0)
     
     Returns:
         List of equation strings in polygen format
     """
     equations = []
     num_pairs = len(plaintexts)
+    if key_offsets is None:
+        key_offsets = [0] * num_pairs
     
     for i in range(num_pairs):
         pt = plaintexts[i]
         ct = ciphertexts[i]
+        ko = key_offsets[i]
         
         # EQ1: Initial state = plaintext bits
         for j in range(32):
@@ -138,7 +143,7 @@ def generate_polygen_equations(
             # EQ2: Main round equation (NLF expanded as ANF)
             # Matches exactly the format in polygen.c/polygen.h
             eq2 = (
-                f"L_{i}_{j} + k_{(j-32) % 64} + L_{i}_{j-32} + L_{i}_{j-16} + L_{i}_{j-23}"
+                f"L_{i}_{j} + k_{((j-32) + ko) % 64} + L_{i}_{j-32} + L_{i}_{j-16} + L_{i}_{j-23}"
                 f" + L_{i}_{j-31} + L_{i}_{j-1}*L_{i}_{j-12} + b_{i}_{j} + L_{i}_{j-6}*L_{i}_{j-12}"
                 f" + L_{i}_{j-6}*L_{i}_{j-31} + L_{i}_{j-12}*L_{i}_{j-23} + L_{i}_{j-23}*L_{i}_{j-31}"
                 f" + b_{i}_{j}*L_{i}_{j-23} + b_{i}_{j}*L_{i}_{j-12} + a_{i}_{j}*L_{i}_{j-23} + a_{i}_{j}*L_{i}_{j-12}"
@@ -257,7 +262,8 @@ def build_keeloq_system(
     plaintexts: list,
     ciphertexts: list,
     rounds: int,
-    use_boolean_ring: bool = True
+    use_boolean_ring: bool = True,
+    key_offsets: list = None
 ):
     """
     Build the polynomial system for KeeLoq over GF(2).
@@ -268,6 +274,13 @@ def build_keeloq_system(
         - k_0, ..., k_63: key bits (shared across all pairs)
         - L_p_0, ..., L_p_{31+rounds}: state bits for pair p
     
+    Args:
+        plaintexts: list of plaintext values
+        ciphertexts: list of ciphertext values  
+        rounds: number of rounds per constraint
+        use_boolean_ring: use BooleanPolynomialRing (default True)
+        key_offsets: list of key schedule offsets per pair (default: all 0)
+    
     Returns:
         ring: polynomial ring
         polys: list of polynomials
@@ -275,6 +288,8 @@ def build_keeloq_system(
     """
     num_pairs = len(plaintexts)
     num_state_vars = 32 + rounds
+    if key_offsets is None:
+        key_offsets = [0] * num_pairs
     
     # Variable names: key vars shared, state vars per pair
     key_names = [f'k{i}' for i in range(64)]
@@ -324,8 +339,8 @@ def build_keeloq_system(
             # NLF output
             nlf_poly = create_nlf_polynomial(ring, x4, x3, x2, x1, x0)
             
-            # Key bit (cyclic)
-            key_bit = k[i % 64]
+            # Key bit (cyclic, with per-pair offset)
+            key_bit = k[(i + key_offsets[p]) % 64]
             
             # Feedback: new_bit = k[i] + L[16] + L[0] + NLF
             feedback = key_bit + L[j - 16] + L[j - 32] + nlf_poly
@@ -453,25 +468,56 @@ def main():
         '--verbose', '-v', action='store_true', default=True,
         help='Verbose output'
     )
+    parser.add_argument(
+        '--slide528', action='store_true',
+        help='Slide528 mode: two 64-round constraints with key offsets 0 and 16'
+    )
     
     args = parser.parse_args()
     
     # Generate random plaintexts and compute ciphertexts
     import random
     random.seed(42)  # reproducible
-    plaintexts = [random.randint(0, 0xFFFFFFFF) for _ in range(args.pairs)]
-    ciphertexts = [keeloq_encrypt(args.key, pt, args.rounds) for pt in plaintexts]
     
-    print("=" * 60)
-    print("KeeLoq Groebner Basis Attack (passagemath)")
-    print("=" * 60)
-    print(f"Rounds:     {args.rounds}")
-    print(f"P/C pairs:  {args.pairs}")
-    print(f"Target key: 0x{args.key:016X}")
-    print(f"Equations:  {'polygen (C)' if args.use_polygen else 'Python (default)'}")
-    for i, (pt, ct) in enumerate(zip(plaintexts, ciphertexts)):
-        print(f"  Pair {i}: P=0x{pt:08X} -> C=0x{ct:08X}")
-    print("=" * 60)
+    if args.slide528:
+        # Slide528 mode: generate a slid pair
+        args.rounds = 64  # Force 64 rounds per constraint
+        P1 = random.randint(0, 0xFFFFFFFF)
+        P2 = keeloq_encrypt(args.key, P1, 64)   # P2 = E_64(K, P1)
+        C1 = keeloq_encrypt(args.key, P1, 528)   # C1 = E_528(K, P1)
+        C2 = keeloq_encrypt(args.key, P2, 528)   # C2 = E_528(K, P2)
+        
+        # Constraint 0: E_64(K, P1) = P2 with key offset 0
+        # Constraint 1: E'_64(K, C1) = C2 with key offset 16
+        plaintexts = [P1, C1]
+        ciphertexts = [P2, C2]
+        key_offsets = [0, 16]
+        
+        print("=" * 60)
+        print("KeeLoq Groebner Basis Attack (Slide528 Mode)")
+        print("=" * 60)
+        print(f"Target key: 0x{args.key:016X}")
+        print(f"Equations:  {'polygen (C)' if args.use_polygen else 'Python (default)'}")
+        print(f"  P1=0x{P1:08X}, P2=0x{P2:08X} (E_64, key offset 0)")
+        print(f"  C1=0x{C1:08X}, C2=0x{C2:08X} (E'_64, key offset 16)")
+        print("=" * 60)
+    else:
+        plaintexts = [random.randint(0, 0xFFFFFFFF) for _ in range(args.pairs)]
+        ciphertexts = [keeloq_encrypt(args.key, pt, args.rounds) for pt in plaintexts]
+        key_offsets = None
+        
+        print("=" * 60)
+        print("KeeLoq Groebner Basis Attack (passagemath)")
+        print("=" * 60)
+        print(f"Rounds:     {args.rounds}")
+        print(f"P/C pairs:  {args.pairs}")
+        print(f"Target key: 0x{args.key:016X}")
+        print(f"Equations:  {'polygen (C)' if args.use_polygen else 'Python (default)'}")
+        for i, (pt, ct) in enumerate(zip(plaintexts, ciphertexts)):
+            print(f"  Pair {i}: P=0x{pt:08X} -> C=0x{ct:08X}")
+        print("=" * 60)
+    
+    num_pairs = len(plaintexts)
     
     # Build polynomial system using the selected method
     print("\nBuilding polynomial system over GF(2)...")
@@ -480,12 +526,12 @@ def main():
         # Use polygen-style equations (with auxiliary variables a, b)
         print("(Using polygen equation format)")
         eq_strings = generate_polygen_equations(
-            plaintexts, ciphertexts, args.rounds
+            plaintexts, ciphertexts, args.rounds, key_offsets=key_offsets
         )
         print(f"Generated {len(eq_strings)} equation strings")
         
         ring, polys, key_names = parse_polygen_equations(
-            eq_strings, args.rounds, args.pairs
+            eq_strings, args.rounds, num_pairs
         )
         num_vars = len(ring.gens())
         print(f"Variables: {num_vars} (64 key + state + auxiliary)")
@@ -493,10 +539,10 @@ def main():
     else:
         # Use default Python implementation
         ring, polys, key_names = build_keeloq_system(
-            plaintexts, ciphertexts, args.rounds
+            plaintexts, ciphertexts, args.rounds, key_offsets=key_offsets
         )
-        num_state = args.pairs * (32 + args.rounds)
-        print(f"Variables: 64 key bits + {num_state} state bits ({args.pairs} pairs)")
+        num_state = num_pairs * (32 + args.rounds)
+        print(f"Variables: 64 key bits + {num_state} state bits ({num_pairs} pairs)")
         print(f"Equations: {len(polys)}")
     
     # Solve
@@ -509,11 +555,20 @@ def main():
         
         # Verify: does this key produce the correct ciphertexts?
         all_match = True
-        for pt, expected_ct in zip(plaintexts, ciphertexts):
-            computed_ct = keeloq_encrypt(recovered_key, pt, args.rounds)
-            if computed_ct != expected_ct:
-                all_match = False
-                break
+        if args.slide528:
+            # In slide528 mode, verify with full 528-round encryption
+            P1_orig = plaintexts[0]
+            P2_orig = ciphertexts[0]
+            # Check: E_528(K, P1) should give the same C1 we used
+            C1_computed = keeloq_encrypt(recovered_key, P1_orig, 528)
+            C2_computed = keeloq_encrypt(recovered_key, P2_orig, 528)
+            all_match = (C1_computed == plaintexts[1] and C2_computed == ciphertexts[1])
+        else:
+            for pt, expected_ct in zip(plaintexts, ciphertexts):
+                computed_ct = keeloq_encrypt(recovered_key, pt, args.rounds)
+                if computed_ct != expected_ct:
+                    all_match = False
+                    break
         
         if all_match:
             print("VERIFIED: Recovered key produces correct ciphertexts!")

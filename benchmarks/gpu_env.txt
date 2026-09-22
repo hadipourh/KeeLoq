@@ -1,0 +1,5 @@
+date=2026-09-04T17:47:47+00:00
+host=4f87e4e2aeda
+NVIDIA RTX PRO 6000 Blackwell Workstation Edition, 12.0, 590.48.01, 97887 MiB, 500.00 W
+cuda=Build cuda_12.8.r12.8/compiler.35583870_0
+kernel=Linux 6.8.0-49-generic x86_64 GNU/Linux

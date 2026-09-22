@@ -1,0 +1,13 @@
+mitm
+mitm_generalized
+tests_mitm_generalized
+mitm_gpu_baseline
+mitm_gpu_kp1515
+mitm_gpu_cp2013
+
+*.log
+phase5_*.log
+cpu_cmp_*.log
+cp_*.log
+kp_*.log
+real_*.log

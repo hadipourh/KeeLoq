@@ -1,12 +1,12 @@
 """
 KeeLoq Cryptanalysis Attacks
 
-This package contains algebraic attack implementations for the KeeLoq cipher:
-- groebner_solver: Groebner basis attack using passagemath
-- sat_solver: SAT-based attack using CryptoMiniSat/PySAT
+Subpackages:
+- algebraic: reduced-round algebraic attacks (SAT, Groebner, equation generation)
+- fixedpoint: full 528-round fixed-point attack
 """
 
-from .groebner_solver import keeloq_encrypt
-from .sat_solver import KeeLoqSAT
+from .algebraic.groebner_solver import keeloq_encrypt
+from .algebraic.sat_solver import KeeLoqSAT
 
-__all__ = ['keeloq_encrypt', 'KeeLoqSAT']
+__all__ = ["keeloq_encrypt", "KeeLoqSAT"]

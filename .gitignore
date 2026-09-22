@@ -43,7 +43,30 @@ env/
 *.out
 keeloq
 
+# Cube verifier (built from source)
+/attacks/cube/verify_cube_par
+
+# Temporary experiments and paper previews
+/tmp/
+
+# Generated phase-one candidate data (keep benchmark summaries)
+/benchmarks/fixedpoint_data.txt
+
 # Misc
 *.log
 .coverage
 htmlcov/
+
+# Fixed-point attack build artifacts
+attacks/fixedpoint/fixedpoint_mt
+attacks/fixedpoint/singleton_helper.dylib
+attacks/fixedpoint/singleton_gpu_prefilter
+attacks/fixedpoint/peel_test
+attacks/fixedpoint/bench_small
+attacks/fixedpoint/test_e16
+attacks/fixedpoint/fixedpoint_data.txt
+attacks/fixedpoint/fixedpoint_benchmark.csv
+attacks/fixedpoint/fixedpoint_benchmark.txt
+attacks/fixedpoint/myenv/
+attacks/fixedpoint/venv/
+attacks/paper/

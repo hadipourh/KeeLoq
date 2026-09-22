@@ -1,0 +1,2 @@
+python-sat
+pycryptosat

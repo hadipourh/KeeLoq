@@ -1,0 +1,3 @@
+passagemath-standard>=10.6.30
+python-sat>=1.8.0
+pycryptosat>=5.11.0

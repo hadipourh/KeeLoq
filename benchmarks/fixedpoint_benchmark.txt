@@ -1,0 +1,61 @@
+================================================================
+  Fixed-Point Attack Benchmark Results
+================================================================
+  Keys tested:      100
+  Phase 1 threads:  256
+  Phase 2 threads:  192
+  SAT solver:       cadical
+  Mode:             full (phase1+phase2)
+  Oracle skip P2:   no
+  Phase 1 presence: 85/100 (85.0%, votes_true > 0)
+  Phase 1 absent:   15/100 (15.0%, votes_true = 0)
+  Success rate:     85/100 (85.0%)
+  Phase 1 top-1:    20/100 (20.0%, true k16 rank = #1)
+  Phase 1 rank<=10: 28/100 (28.0%)
+  Phase 1 rank<=100:35/100 (35.0%)
+  Phase 1 rank<=1k: 53/100 (53.0%)
+  Phase 1 non-top1: 80/100 (80.0%, true k16 rank > #1)
+
+  Phase 1 (Scan) Timing [seconds]:
+    Mean:   0.0
+    Std:    0.0
+    Min:    0.0
+    Median: 0.0
+    Max:    0.0
+    P25:    0.0
+    P75:    0.0
+
+  Phase 2 Timing [seconds] (successful only, n=85):
+    Mean:   6.0
+    Std:    5.7
+    Min:    1.0
+    Median: 3.3
+    Max:    17.7
+    P25:    1.7
+    P75:    8.5
+
+  Total Time [seconds] (all keys, n=100):
+    Mean:   7.9
+    Std:    6.6
+    Min:    1.2
+    Median: 4.1
+    Max:    18.8
+    P25:    2.0
+    P75:    17.0
+  Total Time [seconds] (successful only, n=85):
+    Mean:   6.2
+    Median: 3.5
+
+  Survivors per key:
+    Mean:   65525
+    Min:    64880
+    Median: 65526
+    Max:    66113
+
+  True k[0..15] votes:
+    Mean:   4.5
+    Min:    0
+    Median: 4.0
+    Max:    18
+
+================================================================

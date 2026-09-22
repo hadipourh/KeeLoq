@@ -15,16 +15,19 @@ else
 endif
 
 # Source files
-SRCS := main.c keeloq.c speed.c attacks/polygen.c
+SRCS := main.c keeloq.c speed.c attacks/algebraic/polygen.c
 OBJS := main.o keeloq.o speed.o polygen.o
 
 # Default target
 all: $(TARGET)
 
+# Cube attack helper targets are delegated to attacks/cube/Makefile.
+CUBE_MAKE := $(MAKE) -C attacks/cube
+
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
-main.o: main.c keeloq.h speed.h attacks/polygen.h
+main.o: main.c keeloq.h speed.h attacks/algebraic/polygen.h
 	$(CC) $(CFLAGS) -c main.c
 
 keeloq.o: keeloq.c keeloq.h
@@ -33,10 +36,12 @@ keeloq.o: keeloq.c keeloq.h
 speed.o: speed.c speed.h keeloq.h
 	$(CC) $(CFLAGS) -c speed.c
 
-polygen.o: attacks/polygen.c attacks/polygen.h
-	$(CC) $(CFLAGS) -c attacks/polygen.c
+polygen.o: attacks/algebraic/polygen.c attacks/algebraic/polygen.h
+	$(CC) $(CFLAGS) -c attacks/algebraic/polygen.c
 
 # Build modes
+build: all
+
 debug:
 	$(MAKE) BUILD=debug all
 
@@ -55,10 +60,23 @@ polygen: $(TARGET)
 
 # Cryptanalysis (Python)
 groebner:
-	$(PYTHON) attacks/groebner_solver.py
+	$(PYTHON) attacks/algebraic/groebner_solver.py
 
 sat:
-	$(PYTHON) attacks/sat_solver.py
+	$(PYTHON) attacks/algebraic/sat_solver.py
+
+# Cube attack helpers
+cube-build:
+	$(CUBE_MAKE) build
+
+cube-verify:
+	$(CUBE_MAKE) verify ROUNDS="$(ROUNDS)" NKEYS="$(NKEYS)" SEED="$(SEED)" CUBE="$(CUBE)"
+
+cube-dim31:
+	$(CUBE_MAKE) dim31 CONST_BIT="$(CONST_BIT)" NKEYS="$(NKEYS)" SEED="$(SEED)" DIM31_ROUNDS="$(DIM31_ROUNDS)" TIMEOUT="$(TIMEOUT)"
+
+# Convenience alias since no other top-level verify target exists.
+verify: cube-verify
 
 # Setup
 setup-python:
@@ -70,4 +88,5 @@ clean:
 	rm -rf attacks/__pycache__
 	find . -name "*.pyc" -delete
 
-.PHONY: all debug release run speed polygen groebner sat setup-python clean
+.PHONY: all build debug release run speed polygen groebner sat \
+	cube-build cube-verify cube-dim31 verify setup-python clean
