@@ -221,9 +221,13 @@ KeeLoq/
 │   │   ├── keeloq_bruteforce.cu # Bit-sliced GPU kernel
 │   │   └── README.md          # Build, benchmark, and cost analysis
 │   ├── cube/              # Monomial-prediction search + empirical cube verifier
+│   ├── paper/             # Technical report: LaTeX source, figures, and PDF
 │   └── library/           # Reference papers
 └── pictures/          # Documentation images
 ```
+
+The [technical report](attacks/paper/README.md) includes the
+[PDF](attacks/paper/paper.pdf) and [LaTeX source](attacks/paper/paper.tex).
 
 ## Test Vectors
 

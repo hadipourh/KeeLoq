@@ -67,9 +67,9 @@ This validates the CPU reference on three bounded random-key cases, each with an
 
 KeeLoq uses a 64-bit key, a 32-bit block, and 528 encryption rounds. Each round uses one bit of the key. Because the key is 64 bits and the key schedule repeats every 64 rounds, the full cipher is:
 
-$$
+```math
 E_{528} = E_{16} \circ (E_{64})^8
-$$
+```
 
 ![KeeLoq Encryption Round](../../pictures/KeeLoq-Encryption.svg)
 
@@ -81,23 +81,23 @@ That repetition is the structural weakness the attack exploits.
 
 The input data are known plaintext ciphertext records $(P_i, C_i)$ with $C_i = E_K(P_i)$. The attack looks for a **slid pair**: two records $(P_i, C_i)$ and $(P_j, C_j)$ from the dataset such that
 
-$$
+```math
 P_j = E_{64}(K, P_i).
-$$
+```
 
 When such a pair exists, the repeating structure of the cipher lets us split the full 528 round encryption into manageable pieces.
 
 **Why $2^{16}$ records?** The attack needs a slid pair. Under the random-permutation and random-data heuristic, an ordered pair of distinct records satisfies $P_j=E_{64}(K,P_i)$ with probability about $2^{-32}$. With $N(N-1)$ ordered candidates, the expected count is approximately
 
-$$
+```math
 \mu = \frac{N(N-1)}{2^{32}} \approx \frac{N^2}{2^{32}}.
-$$
+```
 
 The pair events share records and are not independent, so the count is not exactly binomial. Using the usual sparse-event Poisson approximation gives
 
-$$
+```math
 \Pr[\text{at least one slid pair}] \approx 1 - e^{-\mu}.
-$$
+```
 
 Setting $\mu = 1$ gives $N \approx 2^{16}$, at which point $\Pr \approx 1 - e^{-1} \approx 0.63$.
 
@@ -109,9 +109,9 @@ Setting $\mu = 1$ gives $N \approx 2^{16}$, at which point $\Pr \approx 1 - e^{-
 
 The attack assumes access to about $2^{16}$ known plaintext–ciphertext records. A chosen-plaintext setting additionally lets the attacker select the inputs. In either case the dataset is
 
-$$
+```math
 \mathcal{D} = \{(P_0, C_0),\, (P_1, C_1),\, \ldots,\, (P_{N-1}, C_{N-1})\}, \quad C_i = E_{528}(K, P_i).
-$$
+```
 
 As shown in the previous section, with $N = 2^{16}$ the dataset contains at least one slid pair with probability about 0.63.
 
@@ -125,7 +125,7 @@ Each candidate pair goes through the key split and round peeling steps below. Un
 
 The 64-bit key is split into four chunks of **16 bits each**. Following the paper's notation, $K_0$ is the least significant chunk and $K_3$ is the most significant:
 
-$$
+```math
 K = K_3 \| K_2 \| K_1 \| K_0
 \qquad
 \begin{cases}
@@ -134,7 +134,7 @@ K_1 = k[16..31]  \\
 K_2 = k[32..47]  \\
 K_3 = k[48..63]  & \text{(most significant)}
 \end{cases}
-$$
+```
 
 Each record in the dataset is a full 528 round encryption: $C_i = E_{528}(K,\, P_i)$. Because $E_{528} = E_{16} \circ (E_{64})^8$, the first 16 rounds use $K_0$. The last 16 rounds also use $K_0$ because rounds 512 to 527 access key positions $(512..527) \bmod 64 = 0..15$. So once we guess $K_0$, we can peel the outer layers from both ends.
 
@@ -142,29 +142,29 @@ Each record in the dataset is a full 528 round encryption: $C_i = E_{528}(K,\, P
 
 One KeeLoq round is $s' = (s \gg 1) \mid (\mathit{fb} \ll 31)$: the state shifts right by one bit and a new feedback bit $\mathit{fb}$ is injected at the top. After $t \leq 32$ forward rounds from state $A$ to state $B$:
 
-$$
+```math
 B[31:32{-}t] = \text{new feedback bits (key dependent)}, \qquad B[31{-}t:0] = A[31:t] \quad \text{(passthrough, free)}.
-$$
+```
 
 Decryption reverses the shift, so after $t \leq 32$ backward rounds from state $A$ to state $B$:
 
-$$
+```math
 B[31:t] = A[31{-}t:0] \quad \text{(passthrough, free)}, \qquad B[t{-}1:0] = \text{new reverse feedback bits (key dependent)}.
-$$
+```
 
 For $t = 16$, the **low** 16 bits of a forward encrypted state, $B[15:0] = A[31:16]$, and the **high** 16 bits of a backward decrypted state, $B[31:16] = A[15:0]$, are passthrough copies. No key bits are needed to compute them. The other 16 bits are new feedback bits and do depend on the key.
 
 Now assume the current ordered pair is a genuine slid pair, so
 
-$$
+```math
 P_j = E_{64}(K, P_i).
-$$
+```
 
 On the ciphertext side, the key schedule starts at offset $528\bmod64=16$. Write $E'_{64}$ for that shifted 64-round map. The slid relation is
 
-$$
+```math
 C_j = E'_{64}(K, C_i).
-$$
+```
 
 Thus the plaintext row uses chunks $K_0,K_1,K_2,K_3$, while the ciphertext row uses $K_1,K_2,K_3,K_0$, as shown in the diagram.
 
@@ -281,50 +281,50 @@ for each K₀ candidate:                             // 2^16 iterations
 **Step 1 — Outer loop: guess $K_0$ ($2^{16}$ values).**
 For each guess, compute for all $N$ records:
 
-$$
+```math
 X_i = \mathrm{enc}_{16}(K_0, P_i), \qquad Y_i = \mathrm{dec}_{16}(K_0, C_i).
-$$
+```
 
 The implementation stores these in two cached arrays, `X_cache[i]` and `Y_cache[i]`, and reuses them across all $2^{t_o}$ overlap guesses for the same $K_0$.
 
 **Step 2 — Inner loop: guess $u = P^\star_j[15:0]$ ($2^{16}$ values).**
 The backward passthrough fixes the upper half of $P^\star_j$ for free: $P^\star_j[31:16] = P_j[15:0]$. The guess $u$ supplies the lower half, so the full state is known:
 
-$$
+```math
 P^\star_j = (P_j[15:0] \ll 16) \mid u.
-$$
+```
 
 Now both endpoints of the transition $P^\star_j \xrightarrow{K_3, 16} P_j$ are known. **Linear key extraction** recovers the 16 key bits one round at a time. In round $r$, the passthrough places the feedback bit $\mathit{fb}_r$ at a known position of $P_j$, and the running state is fully known from $P^\star_j$. So solving $k[48+r] = \mathit{fb}_r \oplus \mathrm{NLF}(s_r) \oplus s_r[16] \oplus s_r[0]$ is just one XOR. Repeating this for 16 rounds gives $K_3 = k[48..63]$. The same idea is used for $K_1$ and $K_2$. Then compute $Y^\star_j = \mathrm{dec}_{16}(K_3, Y_j)$ and store it in a hash table keyed by $Y^\star_j[15:0]$.
 
 **Step 3 — Left-side construction and extract $K_1$.**
 The 16-round middle transition is $X^\star_i \xrightarrow{K_2,16} P^\star_j$. For any true candidate pair, passthrough over these 16 rounds gives
 
-$$
+```math
 P^\star_j[15:0] = X^\star_i[31:16].
-$$
+```
 
 Since the current guess is $u = P^\star_j[15:0]$, we must have $X^\star_i[31:16] = u$. The forward passthrough on $X_i \xrightarrow{K_1,16} X^\star_i$ also gives $X^\star_i[15:0] = X_i[31:16]$. Together these fix the full state
 
-$$
+```math
 X^\star_i = u \parallel X_i[31:16].
-$$
+```
 
 So for each record $i$, build $X^\star_i$ from $u$ and $X_i$, extract $K_1 = k[16..31]$ from the pair $(X_i, X^\star_i)$, compute $C^\star_i = \mathrm{enc}_{16}(K_1, C_i)$, and probe the table with $C^\star_i[31:16]$.
 
 **Step 4 — Collision: extract $K_2$ and verify.**
 A hit means $C^\star_i[31:16] = Y^\star_j[15:0]$. The baseline implementation then extracts the middle 16 key bits in **two** ways:
 
-$$
+```math
 K_2^{(C)} = \text{extract from } (C^\star_i, Y^\star_j),
 \qquad
 K_2^{(P)} = \text{extract from } (X^\star_i, P^\star_j).
-$$
+```
 
 Only if these two values agree do we assemble
 
-$$
+```math
 K = K_3 \parallel K_2 \parallel K_1 \parallel K_0
-$$
+```
 
 and verify the candidate key against known pairs. The generalized CPU reference checks records 0, 1, i, and j; GPU kernels check records 0 and 1 before reporting a match. The benchmark then compares with the known synthetic key. These are selected-pair checks, not a scan of the entire dataset. This cross-check removes many false positives before final verification.
 
@@ -395,29 +395,31 @@ for each K₀ candidate:
 
 For the baseline $(16,16,16)$ profile, the cache step costs $2^{16}\cdot N\cdot32=2^{37}$ round operations at $N=2^{16}$. Each right-side candidate needs both a 16-round extraction and a 16-round decryption; each left-side candidate similarly needs extraction and encryption. Counting both operations, the inner build/probe work before collision checks is
 
-$$2^{16}\cdot2^{16}\cdot2^{16}\cdot(2t_c+2t_p)=2^{54}\text{ round operations}.$$
+```math
+2^{16}\cdot2^{16}\cdot2^{16}\cdot(2t_c+2t_p)=2^{54}\text{ round operations}.
+```
 
 Dividing by 528 gives about $2^{45}$ full-encryption equivalents. Counting only one operation on each side would miss a factor of two.
 
 In Sect. 3.3 the paper models the baseline cost as
 
-$$
+```math
 2^{16} \left( 32 \cdot 2^{16} + 2^{16} \left( 32 \cdot 2^{16} + 2^{16} (32 + N_{\text{coll}} \cdot V) \right) \right),
-$$
+```
 
 with $N_{\text{coll}} = 1$ and average verification cost $V \approx 4$. This gives about $2^{54.0}$ KeeLoq rounds, or about $2^{45.0}$ full KeeLoq encryptions, which is the figure quoted in the paper.
 
 For the **generalized** implementation, the overlap guess fixes only `to` bits. When these counts are nonnegative, the remaining `tc-to` low bits of $P^\star_j$ and `tp-to` high bits of $X^\star_i$ are enumerated explicitly by `build_pstar_candidates()` and `build_xstar_candidates()`. Sect. 3.4 of the paper gives the corresponding general expression
 
-$$
+```math
 2^{16} \left( 32 \cdot 2^{16} + 2^{t_o} \left( 2t_c \cdot 2^{16+t_c-t_o} + 2^{16+t_p-t_o}(2t_p + N_{\text{coll}} \cdot V) \right) \right),
-$$
+```
 
 which simplifies there to an optimum at $(t_p, t_c, t_o) = (15,15,14)$ with time about $2^{44.5}$ full KeeLoq encryptions. Our generalized code follows the same geometry, but expresses it operationally by explicitly enumerating the admissible $P^\star_j$ and $X^\star_i$ candidates. For profiles with $t_p,t_c\geq t_o$, the corresponding partial-round work before collision checks scales as
 
-$$
+```math
 2^{16} \cdot 2^{t_o} \cdot N \cdot \big(2^{t_c-t_o} \cdot 2t_c + 2^{t_p-t_o} \cdot 2t_p\big),
-$$
+```
 
 before adding hash-table overhead, collision testing, and final verification. If $t_c<t_o$ or $t_p<t_o$, an overlap may conflict with passthrough bits and produce no candidate; the bounds below use nonnegative free-bit counts. The repository profiles `(15,15,14)` and `(20,13,17)` match the paper's Sect. 3.4 and Sect. 3.5 geometries, while the exact wall-clock cost depends on these extra enumeration and verification terms. Note however that `mitm_gpu_cp2013` implements the fixed `(20,13,17)` geometry only; unlike the paper's chosen-plaintext attack, it does not enforce a chosen-plaintext structure or reduce the overlap-guess space from $2^{17}$ to $2^{13}$.
 
@@ -432,11 +434,11 @@ For each fixed $K_0$, the pseudocode keeps:
 
 So the working memory is
 
-$$
+```math
 M_{\text{baseline}} = O(N),
 \qquad
 M_{\text{generalized}} = O\!\left(N \cdot 2^{\max(t_c-t_o,0)}\right) + O\!\left(2^{\max(t_c-t_o,0)} + 2^{\max(t_p-t_o,0)} + 2^{t_o}\right),
-$$
+```
 
 The terms account for stored records, candidate buffers, and the $2^{t_o}$ bucket heads. These are per-overlap CPU bounds; GPU batches multiply storage by their active batch dimensions. Candidates are not fractionally allocated when $t_c<t_o$.
 
@@ -446,11 +448,11 @@ Correctness note: every right-side candidate is retained. The CPU implementation
 
 This repository implements all three profiles from the paper:
 
-| Implementation                                     | Profile$(t_p, t_c, t_o)$ | Time              | Paper     |
+| Implementation                                     | Profile $(t_p, t_c, t_o)$ | Time              | Paper     |
 | -------------------------------------------------- | -------------------------- | ----------------- | --------- |
-| `mitm.c`, `mitm_gpu_baseline`                  | `(16, 16, 16)`           | about$2^{45.0}$ | Sect. 3.3 |
-| `mitm_generalized`, `mitm_gpu_kp1515`          | `(15, 15, 14)`           | about$2^{44.5}$ | Sect. 3.4 |
-| `mitm_generalized --chosen`                    | `(20, 13, 17)`           | about$2^{44.5}$ | Sect. 3.5 |
+| `mitm.c`, `mitm_gpu_baseline`                  | `(16, 16, 16)`           | about $2^{45.0}$ | Sect. 3.3 |
+| `mitm_generalized`, `mitm_gpu_kp1515`          | `(15, 15, 14)`           | about $2^{44.5}$ | Sect. 3.4 |
+| `mitm_generalized --chosen`                    | `(20, 13, 17)`           | about $2^{44.5}$ | Sect. 3.5 |
 | `mitm_gpu_cp2013`                              | `(20, 13, 17)`           | geometry only    | Sect. 3.5 geometry |
 
 ---
@@ -528,8 +530,8 @@ graph TB
 | Metric                  | Value                                       |
 | ----------------------- | ------------------------------------------- |
 | Data                    | $2^{16}$ known plaintext/ciphertext pairs |
-| Time (profile 16/16/16) | about$2^{45.0}$ encryptions               |
-| Time (profile 15/15/14) | about$2^{44.5}$ encryptions               |
+| Time (profile 16/16/16) | about $2^{45.0}$ encryptions               |
+| Time (profile 15/15/14) | about $2^{44.5}$ encryptions               |
 | Time (profile 20/13/17, chosen-plaintext reduction) | about $2^{44.5}$ encryptions; not the geometry-only GPU binary |
 
 Design note: `mitm_generalized` is the CPU reference that accepts CLI profile parameters (`--tp`, `--tc`, with `to = tp + tc - 16` derived internally). The GPU binaries are intentionally profile-specific to keep kernels fast and benchmarking reproducible.

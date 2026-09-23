@@ -109,21 +109,29 @@ Any fixed point of $(E_{64})^8$ must belong to a 1-cycle, 2-cycle, 4-cycle, or 8
 
 > **Heuristic assumption.** The analysis below models $E_{64}$ as a uniform random permutation on $2^{32}$ elements. This is standard in cryptanalysis. It is not a proven property of KeeLoq. The benchmarks below match the main predictions of this model.
 
-Model $F=E_{64}$ as a random permutation on $2^{32}$ elements, then study $F^8$; its eighth power is not itself uniformly distributed over permutations. Its fixed points are exactly the elements in 1-cycles, 2-cycles, 4-cycles, and 8-cycles of $F$. The small-cycle counts are approximately independent $\operatorname{Poisson}(1/d)$ variables, and each $d$-cycle contributes $d$ fixed points. So the total number of true fixed points is approximated by:
+Model $F=E_{64}$ as a random permutation on $2^{32}$ elements, then study $F^8$; its eighth power is not itself uniformly distributed over permutations. Its fixed points are exactly the elements in 1-cycles, 2-cycles, 4-cycles, and 8-cycles of $F$. The small-cycle counts are approximately independent $\mathrm{Poisson}(1/d)$ variables, and each $d$-cycle contributes $d$ fixed points. So the total number of true fixed points is approximated by:
 
-$$\text{FP}_{\text{true}} = 1 \cdot \operatorname{Poi}(1) + 2 \cdot \operatorname{Poi}(\tfrac{1}{2}) + 4 \cdot \operatorname{Poi}(\tfrac{1}{4}) + 8 \cdot \operatorname{Poi}(\tfrac{1}{8})$$
+```math
+\text{FP}_{\text{true}} = 1 \cdot \mathrm{Poi}(1) + 2 \cdot \mathrm{Poi}(\tfrac{1}{2}) + 4 \cdot \mathrm{Poi}(\tfrac{1}{4}) + 8 \cdot \mathrm{Poi}(\tfrac{1}{8})
+```
 
-Under this model, the four terms are asymptotically independent. Each term $d \cdot \operatorname{Poi}(1/d)$ has mean 1 and variance $d$. Summing gives:
+Under this model, the four terms are asymptotically independent. Each term $d \cdot \mathrm{Poi}(1/d)$ has mean 1 and variance $d$. Summing gives:
 
-$$\mathbb{E}[\text{FP}_{\text{true}}] = 1 + 1 + 1 + 1 = 4$$
+```math
+\mathbb{E}[\text{FP}_{\text{true}}] = 1 + 1 + 1 + 1 = 4
+```
 
-$$\operatorname{Var}[\text{FP}_{\text{true}}] = 1 + 2 + 4 + 8 = 15$$
+```math
+\mathrm{Var}[\text{FP}_{\text{true}}] = 1 + 2 + 4 + 8 = 15
+```
 
-This is much more spread out than $\operatorname{Poisson}(4)$, which has variance 4. The main reason is the 8-cycle term: one 8-cycle adds 8 fixed points at once, so the right tail is much heavier.
+This is much more spread out than $\mathrm{Poisson}(4)$, which has variance 4. The main reason is the 8-cycle term: one 8-cycle adds 8 fixed points at once, so the right tail is much heavier.
 
 To get **zero** true fixed points, all four cycle types must be absent at once:
 
-$$P(\text{FP}_{\text{true}} = 0) = e^{-1} \cdot e^{-1/2} \cdot e^{-1/4} \cdot e^{-1/8} = e^{-15/8} \approx 15.3\%$$
+```math
+P(\text{FP}_{\text{true}} = 0) = e^{-1} \cdot e^{-1/2} \cdot e^{-1/4} \cdot e^{-1/8} = e^{-15/8} \approx 15.3\%
+```
 
 So the expected **Phase 1 presence rate** is $1 - e^{-15/8} \approx 84.7\%$, where `votes_true > 0` means at least one true fixed point was found.
 
@@ -161,7 +169,9 @@ For each plaintext $S \in \{0, \ldots, 2^{32} - 1\}$:
 
 In KeeLoq encryption, each round computes a feedback bit:
 
-$$\text{fb} = \text{NLF}(s_{31}, s_{26}, s_{20}, s_9, s_1) \oplus k_i \oplus s_{16} \oplus s_0$$
+```math
+\text{fb} = \text{NLF}(s_{31}, s_{26}, s_{20}, s_9, s_1) \oplus k_i \oplus s_{16} \oplus s_0
+```
 
 where $s$ is the current 32-bit state and $k_i$ is key bit $i \bmod 64$. The state then shifts right by one, and $\text{fb}$ enters at position 31.
 
@@ -171,7 +181,9 @@ After 16 rounds starting from $S$:
 
 Since we know both $S$ and $C$, we can recover each key bit by rearranging the round equation:
 
-$$k_i = C[16+i] \oplus \text{NLF}(s) \oplus s_{16} \oplus s_0$$
+```math
+k_i = C[16+i] \oplus \text{NLF}(s) \oplus s_{16} \oplus s_0
+```
 
 The algorithm is:
 
@@ -198,7 +210,7 @@ After peeling, we have about $2^{16}$ survivors, each with a peeled 16-bit value
 
 - **False positives** (about $2^{16}$): These pass the filter but are not true fixed points. Their peeled values populate the wrong-key bins. They cannot enter the true bin: matching $E_{16}(K,S)=E_{528}(K,S)$ with the correct low key implies $F^8(S)=S$.
 
-**The competition:** About $2^{16}$ false positives spread across $2^{16}$ bins, so the expected count per bin is about 1, following $\operatorname{Poisson}(1)$. The largest false bin usually gets 7 to 9 votes.
+**The competition:** About $2^{16}$ false positives spread across $2^{16}$ bins, so the expected count per bin is about 1, following $\mathrm{Poisson}(1)$. The largest false bin usually gets 7 to 9 votes.
 
 Eight or more true votes usually place the true group near rank #1, but this is not a guarantee. A false bin can tie or exceed that count. With fewer votes, the true group may be buried below false-positive bins.
 
@@ -206,9 +218,9 @@ Eight or more true votes usually place the true group near rank #1, but this is 
 
 ### Rank Distribution: Why Top-1 Is Hard
 
-The false-positive survivors each peel to a random $k_{16}$ value, so wrong-bin vote counts are modeled approximately by $\operatorname{Poisson}(1)$. The number of false bins with $\geq k$ votes is:
+The false-positive survivors each peel to a random $k_{16}$ value, so wrong-bin vote counts are modeled approximately by $\mathrm{Poisson}(1)$. The number of false bins with $\geq k$ votes is:
 
-| Votes $\geq k$ | $P(\operatorname{Poi}(1) \geq k)$ | Expected false bins (out of $2^{16}$) | Approximate rank upper estimate, counting all ties ahead |
+| Votes $\geq k$ | $P(\mathrm{Poi}(1) \geq k)$ | Expected false bins (out of $2^{16}$) | Approximate rank upper estimate, counting all ties ahead |
 |:-:|:-:|:-:|:-:|
 | 5 | 0.00366 | $\sim 240$ | $\sim 240$ |
 | 6 | 0.000594 | $\sim 39$ | $\sim 40$ |
@@ -307,11 +319,11 @@ Phase 2 groups all survivors by their peeled $k[0..15]$ value and processes thos
 
 For each group with at least two candidates, Phase 2 fixes source indices 0 and 1 and tries every directed target pair:
 
-$$
+```math
 E_{48}(k[16..63], M_{16,0}) = S_b,
 \qquad
 E_{48}(k[16..63], M_{16,1}) = S_d,
-$$
+```
 
 for all $b,d \in \{0,\dots,n-1\}$. This exhaustive $n^2$ sweep covers 1-cycles, 2-cycles, 4-cycles, and 8-cycles uniformly.
 
@@ -322,9 +334,9 @@ for all $b,d \in \{0,\dots,n-1\}$. This exhaustive $n^2$ sweep covers 1-cycles, 
 
 If Sweep A finds nothing, Sweep B processes all singleton groups. This also happens when there is no true fixed point at all. If a singleton is the true group, it corresponds to a 1-cycle and satisfies
 
-$$
+```math
 E_{48}(k[16..63], M_{16}) = S.
-$$
+```
 
 A single 48-round constraint leaves exactly $2^{16}$ residual solutions. Instead of enumerating SAT models, the implementation reconstructs these $2^{16}$ candidates directly by guessing the first 16 feedback bits and deriving the remaining 48 key bits along the round recurrence. Each reconstructed key is then checked against cross-verification pairs.
 
@@ -351,9 +363,9 @@ The theoretical exhaustive recovery procedure covers both cases:
 
 For the ideal exhaustive procedure, the small-cycle Poisson approximation gives the same end-to-end probability as Phase 1 presence:
 
-$$
+```math
 P(\text{success}) \approx 1 - e^{-15/8} \approx 84.7\%.
-$$
+```
 
 ## Benchmarks and Expected Behavior
 

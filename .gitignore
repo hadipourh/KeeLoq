@@ -69,4 +69,15 @@ attacks/fixedpoint/fixedpoint_benchmark.csv
 attacks/fixedpoint/fixedpoint_benchmark.txt
 attacks/fixedpoint/myenv/
 attacks/fixedpoint/venv/
-attacks/paper/
+# Publish the paper and its build inputs; keep local notes and TeX outputs private.
+/attacks/paper/*
+!/attacks/paper/README.md
+!/attacks/paper/paper.tex
+!/attacks/paper/paper.bib
+!/attacks/paper/paper.pdf
+!/attacks/paper/iacrcc.cls
+!/attacks/paper/tikzlibrarycipher.code.tex
+!/attacks/paper/figures/
+/attacks/paper/figures/*
+!/attacks/paper/figures/KeeLoq-Encryption.pdf
+!/attacks/paper/figures/KeeLoq-Decryption.pdf

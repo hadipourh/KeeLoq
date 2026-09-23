@@ -61,21 +61,21 @@ The ciphertext and plaintext are input/output in a similar way: The ciphertext i
 
 The NLF is a boolean function of 5 variables and is of degree 3. In the specification [4] the NLF is assigned using a table. This corresponds to the following ANF:
 
-$$
+```math
 NLF(x_4, x_3, x_2, x_1, x_0) = x_0 \oplus x_1 \oplus x_0 x_1 \oplus x_1 x_2 \oplus x_2 x_3 \oplus x_0 x_4 \oplus x_0 x_3 \oplus x_2 x_4 \oplus x_0 x_1 x_4 \oplus x_0 x_2 x_4 \oplus x_1 x_3 x_4 \oplus x_2 x_3 x_4. \tag{1}
-$$
+```
 
 The NLF is balanced and its correlation immunity order is 1, $\text{cor}(NLF) = 1$ [13], [14]. This means that the NLF is 1-resilient [15], which is the maximum for a function of 5 variables with $\deg(NLF) = 3$ due to Siegenthaler's inequality [13]:
 
-$$
+```math
 \deg(NLF) + \text{cor}(NLF) \leq 4.
-$$
+```
 
 **Fig. 2.** Round structure of KeeLoq encryption
 
-$$
+```math
 Y^{(0)} \xrightarrow{F(K)} Y^{(64)} \xrightarrow{F(K)} Y^{(128)} \xrightarrow{\cdots} Y^{(448)} \xrightarrow{F(K)} Y^{(512)} \xrightarrow{F'(K')} Y^{(528)}
-$$
+```
 
 The KeeLoq algorithm has the following round structure. We define a KeeLoq round as the permutation $F(K) : V_{32} \to V_{32}$ depending on the key $K \in V_{64}$. A KeeLoq quarter round is defined as the permutation $F'(K') : V_{32} \to V_{32}$ depending on the subkey $K' = (k_{15}, \ldots, k_0) \in V_{16}$. Then the whole KeeLoq encryption mapping consists of successively computing 8 full round permutations $F(K)$ and consequently applying the last quarter round permutation $F'(K')$, see Figure 2. Note that the first 8 full rounds are identical. The decryption can be represented in a similar way using inverse permutations $F'(K')^{-1}$ and $F(K)^{-1}$.
 
@@ -106,9 +106,9 @@ As the sliding has to be performed for each guess of $K' = (k_{15}, \ldots, k_0)
 
 This means that the NLF can be efficiently approximated by $x_0 \oplus x_1$. So, if $x_0$, $x_1$ are known and $x_4$, $x_3$, $x_2$ are random and unknown, we can determine $f(K)$ by statistically filtering out the contribution of $NLF(x_4, x_3, x_2, x_1, x_0)$ to the equation
 
-$$
+```math
 NLF(x_4, x_3, x_2, x_1, x_0) \oplus f(K) = 0
-$$
+```
 
 using a very limited number of such samples. $f(K)$ is a key-dependent boolean function remaining constant for all samples.
 
@@ -116,47 +116,47 @@ Here we show how to obtain $k_{16}$ and $k_{32}$ from $I_i$ and $O_i$. The remai
 
 We denote $I_i = Y^{(0)}$ and $O_i = Y^{(64)}$ for each $i$. The idea is to make use of the correlation weakness of the dependency between the output bits $y^{(64)}_0$, $y^{(64)}_1$ and the input bits $Y^{(0)}$. One can compute $Y^{(16)}$ from $Y^{(0)}$, since $K' = (k_{15}, \ldots, k_0)$ is known. For the next bit $y^{(17)}_{31}$, which is the first key-dependent bit, one has the following equation:
 
-$$
+```math
 y^{(32)}_{16} = y^{(17)}_{31} = NLF(y^{(16)}_{31}, y^{(16)}_{26}, y^{(16)}_{20}, y^{(16)}_{9}, y^{(16)}_{1}) \oplus y^{(16)}_{0} \oplus y^{(16)}_{16} \oplus k_{16} = c_0 \oplus k_{16}, \tag{2}
-$$
+```
 
 where $c_0 \in GF(2)$ denotes the key-independent part of (2).
 
 After 32 encryption cycles the following holds:
 
-$$
+```math
 (y^{(32)}_{15}, y^{(32)}_{14}, \ldots, y^{(32)}_{0}) = (y^{(16)}_{31}, y^{(16)}_{30}, \ldots, y^{(16)}_{16}) \in V_{16}.
-$$
+```
 
 Thus, the least significant half of $Y^{(32)}$ is known. Then $y^{(64)}_0$ can be represented as:
 
-$$
+```math
 y^{(64)}_0 = NLF(y^{(32)}_{31}, y^{(32)}_{26}, y^{(32)}_{20}, y^{(32)}_{9}, y^{(32)}_{1}) \oplus y^{(32)}_0 \oplus y^{(32)}_{16} \oplus k_{32} = NLF(y^{(32)}_{31}, y^{(32)}_{26}, y^{(32)}_{20}, y^{(32)}_{9}, y^{(32)}_{1}) \oplus y^{(32)}_0 \oplus (c_0 \oplus k_{16}) \oplus k_{32}, \tag{3}
-$$
+```
 
 where $y^{(64)}_0$, $y^{(32)}_0$, $y^{(32)}_1$, $y^{(32)}_9$, $c_0$ are known and $y^{(32)}_{31}$, $y^{(32)}_{26}$, $y^{(32)}_{20}$, $k_{32}$, $k_{16}$ are unknown. As the first two inputs of the NLF are known, its contribution to (3) can be replaced with the random variate $\varepsilon$ using Lemma 1:
 
-$$
+```math
 NLF(y^{(32)}_{31}, y^{(32)}_{26}, y^{(32)}_{20}, y^{(32)}_{9}, y^{(32)}_{1}) \oplus y^{(32)}_{9} \oplus y^{(32)}_{1} = \varepsilon \tag{4}
-$$
+```
 
 with
 
-$$
+```math
 \Pr\{\varepsilon = 0\} = \frac{5}{8}. \tag{5}
-$$
+```
 
 Then the following holds:
 
-$$
+```math
 y^{(64)}_0 \oplus y^{(32)}_0 \oplus c_0 \oplus y^{(32)}_9 \oplus y^{(32)}_1 = \varepsilon \oplus k_{16} \oplus k_{32}. \tag{6}
-$$
+```
 
 In order to determine $k_{16} \oplus k_{32}$ one has to distinguish between the following two cases: $k_{16} \oplus k_{32} = 0$ and $k_{16} \oplus k_{32} = 1$. In the first case:
 
-$$
+```math
 \Pr\{y^{(64)}_0 \oplus y^{(32)}_0 \oplus c_0 \oplus y^{(32)}_9 \oplus y^{(32)}_1 = 0\} = \frac{5}{8}.
-$$
+```
 
 Otherwise, this probability is $3/8$.
 
@@ -164,15 +164,15 @@ Thus, the bias $\delta$ of the first random variable with respect to the second 
 
 Next we consider $y^{(64)}_1$ and its dependencies from the input and key bits. Similar to (2) one has:
 
-$$
+```math
 y^{(33)}_{16} = NLF(y^{(17)}_{31}, y^{(16)}_{27}, y^{(16)}_{21}, y^{(16)}_{10}, y^{(16)}_{2}) \oplus y^{(16)}_1 \oplus y^{(16)}_{17} \oplus k_{17} = NLF(c_0 \oplus k_{16}, y^{(16)}_{27}, y^{(16)}_{21}, y^{(16)}_{10}, y^{(16)}_{2}) \oplus y^{(16)}_1 \oplus y^{(16)}_{17} \oplus k_{17} = c'_1 \oplus c_2 k_{16} \oplus y^{(16)}_1 \oplus y^{(16)}_{17} \oplus k_{17} = c_1 \oplus c_2 k_{16} \oplus k_{17}, \tag{7}
-$$
+```
 
 where $c'_1 \in GF(2)$ is the free term of NLF, $c_2 \in GF(2)$ is its linear term with respect to $k_{16}$, and $c_1 = c'_1 \oplus y^{(16)}_1 \oplus y^{(16)}_{17} \in GF(2)$. Here $c_1$ and $c_2$ are known and depend on $Y^{(0)}$. Then the second output bit $y^{(64)}_1$ is represented as follows:
 
-$$
+```math
 y^{(64)}_1 = NLF(y^{(33)}_{31}, y^{(33)}_{26}, y^{(33)}_{20}, y^{(33)}_{9}, y^{(33)}_{1}) \oplus y^{(33)}_0 \oplus y^{(33)}_{16} \oplus k_{33} = (\varepsilon \oplus y^{(33)}_9 \oplus y^{(33)}_1) \oplus y^{(33)}_0 \oplus (c_1 \oplus c_2 k_{16} \oplus k_{17}) \oplus k_{33}, \tag{8}
-$$
+```
 
 where the random variate $\varepsilon$ is assigned in a way similar to (4) and $c_0$, $c_1$, $c_2$, $y^{(33)}_0$, $y^{(33)}_9$, $y^{(33)}_1$ are known. To determine $k_{17} \oplus k_{33}$ pairs $(I_i, O_i)$ with $c_2 = 0$ are selected². Then $\varepsilon$ in (8) is filtered out statistically, which recovers $\beta = k_{17} \oplus k_{33}$.
 
@@ -190,9 +190,9 @@ Now $k_{16}$, $k_{32}$ and $k_{17} \oplus k_{33}$ are known. In the next step we
 
 **Linear step and key verification.** The remaining key bits $(k_{63}, \ldots, k_{48}) \in V_{32}$ can be recovered as follows. As $(k_{47}, \ldots, k_0)$ are known, $Y^{(48)}$ can be computed for each pair $(I_i, O_i)$. $y^{(64)}_{16}$ can be expressed as:
 
-$$
+```math
 y^{(64)}_{16} = NLF(y^{(48)}_{31}, y^{(48)}_{26}, y^{(48)}_{20}, y^{(48)}_{9}, y^{(48)}_{1}) \oplus y^{(48)}_{16} \oplus y^{(48)}_{0} \oplus k_{48}, \tag{9}
-$$
+```
 
 which reveals $k_{48}$ since the entire state $Y^{(48)}$ is known. Now $Y^{(49)}$ can be completely calculated which leads to the value of $k_{49}$ using $y^{(64)}_{17}$, and so on. In this way the rest of the key is recovered.
 
@@ -220,9 +220,9 @@ For each guess of $(I_0, O_0)$ and $K'$ operations of the following complexity h
 
 Max. $2^{32}$ candidate keys have to be verified using at most 3 full encryptions which requires max. $2^{34}$ steps. Thus, the overall computational complexity of the attack is
 
-$$
+```math
 2^{32} + \frac{2^{32} \cdot 2^{16}}{2} \cdot (2^2 + 2^{-2} + 2^3 + 2^{-5}) + 2^{34} \approx 2^{50.6} \text{ steps.}
-$$
+```
 
 The memory complexity is quite reasonable and is $2^{32}$ 32-bit words (16 GByte). This enables an attacker to place all plaintext-ciphertext values into RAM which substantially accelerates the implementation of the attack. Most computations in our attack are perfectly parallelizable.
 

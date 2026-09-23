@@ -100,15 +100,15 @@ Monomial prediction studies whether a monomial at the input can contribute to a 
 
 The central object is a monomial trail. If the cipher is written as
 
-$$
+```math
 f = f_r \circ f_{r-1} \circ \cdots \circ f_1,
-$$
+```
 
 then a monomial trail is a sequence
 
-$$
+```math
 \pi_{u^{(0)}}(x^{(0)}) \to \pi_{u^{(1)}}(x^{(1)}) \to \cdots \to \pi_{u^{(r)}}(x^{(r)}),
-$$
+```
 
 where each step is allowed by the local monomial-propagation rule of the corresponding small function. Here, $\pi_{u^{(i)}}(x^{(i)})$ means the monomial described by the binary pattern $u^{(i)}$ in the intermediate variables $x^{(i)}$.
 
@@ -129,9 +129,9 @@ After linking all rounds together, we fix:
 
 So, for example, the solver is asked whether there exists a trail of the form
 
-$$
+```math
 \pi_u(s^{(0)})\,\pi_v(k) \to \cdots \to \pi_{e_j}(s^{(R)}),
-$$
+```
 
 where $u$ encodes the chosen cube, $v$ encodes the allowed key activity, and $e_j$ is the unit vector selecting output bit $j$.
 
@@ -179,9 +179,9 @@ The helper methods in `keeloq_monomial.py` use this to:
 
 KeeLoq is modeled as a 32-bit NLFSR with 64-bit key and round update
 
-$$
+```math
 L[i+32] = k[i \bmod 64] \oplus L[i] \oplus L[i+16] \oplus \mathrm{NLF}(L[i+31], L[i+26], L[i+20], L[i+9], L[i+1]).
-$$
+```
 
 The SAT variables in `keeloq_monomial.py` are monomial indicators:
 
@@ -199,9 +199,9 @@ Whenever one state bit is both shifted forward and used elsewhere in the same ro
 
 Monomial-prediction rule:
 
-$$
+```math
 u \leftrightarrow v_0 \lor v_1 \lor \cdots \lor v_{n-1}.
-$$
+```
 
 This means an active monomial on the input wire must activate at least one outgoing branch, and any active outgoing branch requires the source to be active.
 
@@ -216,19 +216,19 @@ The KeeLoq feedback bit is modeled as an XOR of four inputs:
 
 For an XOR node
 
-$$
+```math
 v = u_0 \oplus u_1 \oplus \cdots \oplus u_{n-1},
-$$
+```
 
 the monomial-prediction rule is: at most one input monomial can be active, and the output monomial is active iff exactly one input monomial is active. In CNF, this is encoded as
 
-$$
+```math
 \bigwedge_{i<j}(\neg u_i \vee \neg u_j)
 \;\wedge\;
 \bigwedge_i(\neg u_i \vee v)
 \;\wedge\;
 (u_0 \vee u_1 \vee \cdots \vee u_{n-1} \vee \neg v).
-$$
+```
 
 So the first group of clauses enforces the no-collision condition, the second group says an active input forces an active output, and the last clause says an active output must come from at least one active input.
 
@@ -242,7 +242,7 @@ The KeeLoq NLF is a 5-to-1 Boolean function on taps `(31, 26, 20, 9, 1)`. Instea
 
 The minimized constraints were derived with [SboxAnalyzer](https://github.com/hadipourh/sboxanalyzer). If we denote the NLF-input monomial indicators by $a_0, a_1, a_2, a_3, a_4$ and the output indicator by $b_0$, the resulting CNF used in the code is:
 
-$$
+```math
 \begin{aligned}
 &(\neg a_0 \vee a_1 \vee a_2 \vee a_4)
 \wedge (\neg a_1 \vee a_2 \vee a_3 \vee a_4)
@@ -255,7 +255,7 @@ $$
 \wedge (\neg a_4 \vee b_0)
 \wedge (\neg a_3 \vee b_0).
 \end{aligned}
-$$
+```
 
 That CNF is embedded directly in `keeloq_monomial.py`. The helper script `gen_nlf_mpt.py` shows how the truth table, ANF, and valid transitions were derived.
 

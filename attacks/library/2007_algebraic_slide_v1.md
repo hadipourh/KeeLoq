@@ -38,7 +38,9 @@ This paper is organised as follows: in Section 2 we describe the cipher and its 
 
 We will use the following notation for functional iteration:
 
-$$f^{(n)}(x) = f(\underbrace{f(\cdots f(}_{n \text{ times}} x)\cdots))$$
+```math
+f^{(n)}(x) = f(\underbrace{f(\cdots f(}_{n \text{ times}} x)\cdots))
+```
 
 ## 2 Cipher Description
 
@@ -46,19 +48,25 @@ The KeeLoq cipher is a strongly unbalanced Feistel construction in which the rou
 
 The cipher has the total of 528 rounds, and it makes sense to view that as $528 = 512 + 16 = 64 \times 8 + 16$. The encryption procedure is periodic with a period of 64 and it has been "cut" at 528 rounds, because 528 is not a multiple of 64, in order to prevent obvious slide attacks (but more advanced slide attacks remain possible as will become clear later). Let $k_{63}, \ldots, k_0$ be the key. In each round, it is bitwise rotated to the right, with wrap around. Therefore, during rounds $i, i + 64, i + 128, \ldots$, the key register is the same. If one imagines the 64 rounds as some $f_k(x)$, then KeeLoq is
 
-$$E_k(x) = g_k(f_k^{(8)}(x))$$
+```math
+E_k(x) = g_k(f_k^{(8)}(x))
+```
 
 with $g(x)$ being a 16-round final step, and $E_k(x)$ being all 528 rounds. The last "surplus" 16 rounds of the cipher use the first 16 bits of the key (by which we mean $k_{15}, \ldots, k_0$) and $g_k$ is a functional "prefix" of $f_k$ (which is also repeated at the end of the whole encryption process). In addition to the simplicity of the key schedule, each round of the cipher uses only one bit of the key. From this we see that each bit of the key is used exactly 8 times, except the first 16 bits, $k_{15}, \ldots, k_0$, which are used 9 times.
 
 At the heart of the cipher is the non-linear function with algebraic normal form (ANF) given by:
 
-$$\text{NLF}(a, b, c, d, e) = d \oplus e \oplus ac \oplus ae \oplus bc \oplus be \oplus cd \oplus de \oplus ade \oplus ace \oplus abd \oplus abc$$
+```math
+\text{NLF}(a, b, c, d, e) = d \oplus e \oplus ac \oplus ae \oplus bc \oplus be \oplus cd \oplus de \oplus ade \oplus ace \oplus abd \oplus abc
+```
 
 Alternatively, the specification documents available [6], say that it is "the non-linear function 3A5C742E" which means that $\text{NLF}(i)$ is the $i$-th bit of that hexadecimal number, counting 0 as the least significant and 31 as the most significant.
 
 The main shift register has 32 bits, (unlike the key shift register with 64 bits), and let $L_i$ denote the leftmost or least-significant bit at the end of round $i$, while denoting the initial conditions as round zero. At the end of round 528, the least significant bit is thus $L_{528}$, and then let $L_{529}, L_{530}, \ldots, L_{559}$ denote the 31 remaining bits of the shift register, with $L_{559}$ being the most significant. The following equation gives the shift-register's feedback:
 
-$$L_i = k_{i-32 \bmod 64} \oplus L_{i-32} \oplus L_{i-16} \oplus \text{NLF}(L_{i-1}, L_{i-6}, L_{i-12}, L_{i-23}, L_{i-30})$$
+```math
+L_i = k_{i-32 \bmod 64} \oplus L_{i-32} \oplus L_{i-16} \oplus \text{NLF}(L_{i-1}, L_{i-6}, L_{i-12}, L_{i-23}, L_{i-30})
+```
 
 where $k_{63}, k_{62}, \ldots, k_1, k_0$ is the original, non-rotating key.
 
@@ -66,7 +74,9 @@ where $k_{63}, k_{62}, \ldots, k_1, k_0$ is the original, non-rotating key.
 
 1. Initialize with the plaintext: $L_{31}, \ldots, L_0 = P_{31}, \ldots, P_0$
 2. For $i = 0, \ldots, 528 - 1$ do:
-$$L_{i+32} = k_{i \bmod 64} \oplus L_i \oplus L_{i+16} \oplus \text{NLF}(L_{i+31}, L_{i+26}, L_{i+20}, L_{i+9}, L_{i+2})$$
+```math
+L_{i+32} = k_{i \bmod 64} \oplus L_i \oplus L_{i+16} \oplus \text{NLF}(L_{i+31}, L_{i+26}, L_{i+20}, L_{i+9}, L_{i+2})
+```
 3. The ciphertext is $C_{31}, \ldots, C_0 = L_{559}, \ldots, L_{528}$.
 
 *[Figure 1: KeeLoq Encryption — diagram showing 32-bit non-linear shift register with NLF block, XOR gate, and 64-bit rotating key register]*
@@ -290,13 +300,17 @@ This solution can be used in practice, and is very similar to a known solution t
 
 The security of KeeLoq depends on the quality of KeeLoq Boolean function NLF. We have:
 
-$$y = \text{NLF}(a, b, c, d, e) = d \oplus e \oplus ac \oplus ae \oplus bc \oplus be \oplus cd \oplus de \oplus ade \oplus ace \oplus abd \oplus abc$$
+```math
+y = \text{NLF}(a, b, c, d, e) = d \oplus e \oplus ac \oplus ae \oplus bc \oplus be \oplus cd \oplus de \oplus ade \oplus ace \oplus abd \oplus abc
+```
 
 Following [4], this function is weak with respect to correlation attacks, it is 1-resilient but it is not 2-resilient and can in fact be quite well approximated by the linear function $d \oplus e$.
 
 From the point of view of algebraic cryptanalysis, the fundamental question to consider is to determine the "Algebraic Immunity" of the NLF, which is also known "Graph Algebraic Immunity" or "I/O degree". We found that it is only 2, and one can verify that this NLF allows one to write the following I/O equation of degree 2 with no extra variables:
 
-$$(e + b + a + y) \cdot (c + d + y) = 0$$
+```math
+(e + b + a + y) \cdot (c + d + y) = 0
+```
 
 However, there is only 1 such equation, and this equation by itself does not give a lot of information on the NLF of KeeLoq. This equation is naturally true with probability 3/4 whatever is the actual NLF used. It is therefore easy to see that this equation alone does not fully specify the NLF, and taken alone cannot be used in algebraic cryptanalysis. When used in combination with other equations, this should allow some algebraic attacks to be faster, at least slightly.
 
@@ -312,7 +326,9 @@ In this attack we will guess the first 16 bits of the key namely $k_0, \ldots, k
 
 Consider what happens when this composition operation is repeated 3 times:
 
-$$B \to B^2 \to B^4 \to B^8$$
+```math
+B \to B^2 \to B^4 \to B^8
+```
 
 We expect that $B^8$ has $11.5 \mapsto 5.75 \mapsto 2.8 \mapsto 1.4$ which is about 1 cycle of even size left. Note that a cycle of $B$ must be of length $0 \bmod 16$ to be of even length for $B^8$. Otherwise, if it is of length $1, 2, \ldots, 15 \bmod 16$ then it will be of odd length for $B^8$. This property allows one to distinguish between $f_k^{(8)}$ and a random permutation that should have about 11–12 even length cycles. The proposed distinguisher works as follows: if there are 6 or more cycles, we say it is the wrong key. Otherwise we say that $k_0, \ldots, k_{15}$ is correct.
 

@@ -36,7 +36,9 @@ This paper is organised as follows: in Section 2 we describe the cipher and its 
 
 We will use the following notation for functional iteration:
 
-$$f^{(n)}(x) = \underbrace{f(f(\cdots f(x)\cdots))}_{n \text{ times}}$$
+```math
+f^{(n)}(x) = \underbrace{f(f(\cdots f(x)\cdots))}_{n \text{ times}}
+```
 
 ---
 
@@ -48,19 +50,25 @@ The round function has one bit of output, and consequently in one round only one
 
 The cipher has the total of 528 rounds, and it makes sense to view $528 = 512 + 16 = 64 \times 8 + 16$. The encryption procedure is periodic with a period of 64 and it has been "cut" at 528 rounds, because 528 is not a multiple of 64, in order to prevent obvious slide attacks (but more advanced slide attacks are possible as will become clear later). Let $k_{63}, \ldots, k_0$ be the key. In each round it is bitwise rotated to the right, with wrap around. Therefore, during rounds $i, i+64, i+128, \ldots$, the key register is the same. If one imagines the 64 rounds as some $f_k(x)$, then KeeLoq is
 
-$$E_k(x) = g_k\!\left(f_k^{(8)}(x)\right)$$
+```math
+E_k(x) = g_k\!\left(f_k^{(8)}(x)\right)
+```
 
 with $g(x)$ being a 16-round final step, and $E_k(x)$ being all 528 rounds. The "surplus" 16 rounds of the cipher use the first 16 bits of the key (by which we mean $k_{15}, \ldots, k_0$) and $g_k$ is a functional "prefix" of $f_k$ (which is also repeated at the end of the whole encryption process). In addition to the simplicity of the key schedule, each round of the cipher uses only one bit of the key. Furthermore, we see that each bit of the key is used exactly 8 times, except the first 16 bits $k_{15}, \ldots, k_0$, which are used 9 times.
 
 At the heart of the cipher is the non-linear function with algebraic normal form (ANF) given by:
 
-$$\mathrm{NLF}(a,b,c,d,e) = d \oplus e \oplus ac \oplus ae \oplus bc \oplus be \oplus cd \oplus de \oplus ade \oplus ace \oplus abcd$$
+```math
+\mathrm{NLF}(a,b,c,d,e) = d \oplus e \oplus ac \oplus ae \oplus bc \oplus be \oplus cd \oplus de \oplus ade \oplus ace \oplus abcd
+```
 
 Alternatively, the specification documents available [8], say that it is the "non-linear function $\mathtt{3A5C742E}$" which means that $\mathrm{NLF}(a,b,c,d,e)$ is the $i$-th bit of that hexadecimal number, where $i = 16a + 8b + 4c + 2d + e$. For example $0, 0, 0, 0, 1$ gives $i=1$ and the second least significant (second from right) bit of "$\mathtt{3A5C742E}$" written in binary.
 
 The main shift register has 32 bits, (unlike the key shift register with 64 bits), and let $L_i$ denote the leftmost or least-significant bit at the end of round $i$, while denoting the initial conditions as round zero. At the end of round 528 the least significant bit is thus $L_{528}$, and then let $L_{529}, L_{530}, \ldots, L_{559}$ denote the remaining bits of the shift register, with $L_{559}$ being the most significant. The following equation gives the shift-register's feedback:
 
-$$L_{i+32} = k_{i \bmod 64} \oplus L_i \oplus L_{i+16} \oplus \mathrm{NLF}(L_{i+31}, L_{i+26}, L_{i+20}, L_{i+9}, L_{i+1})$$
+```math
+L_{i+32} = k_{i \bmod 64} \oplus L_i \oplus L_{i+16} \oplus \mathrm{NLF}(L_{i+31}, L_{i+26}, L_{i+20}, L_{i+9}, L_{i+1})
+```
 
 where $k_{63}, k_{62}, \ldots, k_1, k_0$ is the original key.
 
@@ -88,7 +96,9 @@ where $k_{63}, k_{62}, \ldots, k_1, k_0$ is the original key.
 
 1. Initialize with the plaintext: $L_{31}, \ldots, L_0 = P_{31}, \ldots, P_0$
 2. For $i = 0, \ldots, 528 - 1$ do:
-$$L_{i+32} = k_{i \bmod 64} \oplus L_i \oplus L_{i+16} \oplus \mathrm{NLF}(L_{i+31}, L_{i+26}, L_{i+20}, L_{i+9}, L_{i+1})$$
+```math
+L_{i+32} = k_{i \bmod 64} \oplus L_i \oplus L_{i+16} \oplus \mathrm{NLF}(L_{i+31}, L_{i+26}, L_{i+20}, L_{i+9}, L_{i+1})
+```
 3. The ciphertext is $C_{31}, \ldots, C_0 = L_{559}, \ldots, L_{528}$.
 
 ### 2.1 Cipher Usage
@@ -133,7 +143,9 @@ In an extreme scenario, the whole code-book is known, but not with certainty, an
 
 **Justification:** This is because for up to 32 rounds, all state bits between round $0$ and round $i-1$ are directly known. More precisely, after round $i$, 32 bits are known from the plaintext, and $i$ bits are known from the ciphertext, for $i = 1, 2, \ldots, 32$. Then the key bits are obtained directly: we know all the inputs to NLF, and we know the output of it XORed with the corresponding key bit. We simply have
 
-$$k_{i-32} = L_i \oplus L_{i-32} \oplus L_{i-16} \oplus \mathrm{NLF}(L_{i-1}, L_{i-6}, L_{i-12}, L_{i-23}, L_{i-31})$$
+```math
+k_{i-32} = L_i \oplus L_{i-32} \oplus L_{i-16} \oplus \mathrm{NLF}(L_{i-1}, L_{i-6}, L_{i-12}, L_{i-23}, L_{i-31})
+```
 
 This also shows that there will be exactly one possible key.
 
@@ -195,7 +207,9 @@ We store the triples $p, c, (k_{15}, \ldots, k_0)$ in a data structure keyed by 
 
 The worst-case complexity of Step 2 and Step 3 of our attack will be proportional to the size $\tau$ of our list (if all cases are tried). The expected size of the filtered list can be computed as follows: we assume that the keys that appear in this table are the $2^{16}$ outputs of a random function on 16 bits, that takes as input any of the $2^{16}$ pairs $(p, c)$. Then following Proposition 4.1, the proportion of $\frac{1}{e \cdot i!}$ of keys will appear $i$ times. The total number of keys that will appear 4 or more times is therefore equal to $2^{16} \cdot \sum_{i \geq 4} \frac{1}{e \cdot i!}$. However, we have to check all the triples which is more than all the keys. In our list of $2^{16}$, each of these keys will appear $i$ times (in some triple). In our attack, it is not merely sufficient to find a triple in our list having the correct 16 bits of the key: this is because our list contains several fixed points for $f_k$, but only about one fixed point for $f_k^8$ which is necessary to complete further stages of our attack. Accordingly, the expected number of elements to be checked (the size of our list) is
 
-$$\tau_B = 2^{16} \cdot \sum_{i \geq 4} \frac{i}{e \cdot i!} \approx 2^{12.4}$$
+```math
+\tau_B = 2^{16} \cdot \sum_{i \geq 4} \frac{i}{e \cdot i!} \approx 2^{12.4}
+```
 
 This is the worst-case estimate for the attack version B (which works for 30% of all keys). On average we only need about half of this number.
 
@@ -227,17 +241,29 @@ Our goal is to recover the key of the cipher by solving a system of multivariate
 
 We write equations in a straightforward way: namely by following directly the description of Fig. 1. One new variable represents the output of the NLF function each round. This means we have:
 
-$$y = \mathrm{NLF}(a,b,c,d,e) = d \oplus e \oplus ac \oplus \beta \oplus bc \oplus be \oplus cd \oplus de \oplus \beta d \oplus \beta c \oplus \cdots$$
+```math
+y = \mathrm{NLF}(a,b,c,d,e) = d \oplus e \oplus ac \oplus \beta \oplus bc \oplus be \oplus cd \oplus de \oplus \beta d \oplus \beta c \oplus \cdots
+```
 
 which permits us to write
 
-$$L_{i+32} = k_{i \bmod 64} \oplus L_i \oplus L_{i+16} \oplus L_{i+9} \oplus L_{i+1}$$
-$$\oplus L_{i+31} L_{i+20} \oplus \beta_i \oplus L_{i+26} L_{i+20} \oplus L_{i+26} L_{i+1} \oplus L_{i+20} L_{i+9}$$
-$$\oplus L_{i+9} L_{i+1} \oplus \beta_i L_{i+9} \oplus \beta_i L_{i+20} \oplus \alpha_i L_{i+9} \oplus \alpha_i L_{i+20}$$
+```math
+L_{i+32} = k_{i \bmod 64} \oplus L_i \oplus L_{i+16} \oplus L_{i+9} \oplus L_{i+1}
+```
+```math
+\oplus L_{i+31} L_{i+20} \oplus \beta_i \oplus L_{i+26} L_{i+20} \oplus L_{i+26} L_{i+1} \oplus L_{i+20} L_{i+9}
+```
+```math
+\oplus L_{i+9} L_{i+1} \oplus \beta_i L_{i+9} \oplus \beta_i L_{i+20} \oplus \alpha_i L_{i+9} \oplus \alpha_i L_{i+20}
+```
 
-$$\alpha_i = L_{i+31} L_{i+26}$$
+```math
+\alpha_i = L_{i+31} L_{i+26}
+```
 
-$$\beta_i = L_{i+31} L_{i+1}$$
+```math
+\beta_i = L_{i+31} L_{i+1}
+```
 
 These three equations need merely be repeated for each round.
 
@@ -421,7 +447,9 @@ The NLF function is 1-resilient but it is not 2-resilient and can in fact be qui
 
 From the point of view of algebraic cryptanalysis, the fundamental question to consider is to determine the "Algebraic Immunity" of the NLF, which is also known as "Graph Algebraic Immunity" or "I/O degree". We found that it is 2, and one can verify that this NLF allows one to write the following I/O equation of degree 2 with no extra variables:
 
-$$(e + b + a + y)(c + d + y) = 0$$
+```math
+(e + b + a + y)(c + d + y) = 0
+```
 
 However, there is only 1 such equation, and this equation by itself does not give a lot of information on the NLF of KeeLoq. This equation is "nearly" true with probability 3/4 whatever is the actual NLF used. It is therefore easy to see that this equation alone does not fully specify the NLF, and taken alone cannot be used in algebraic cryptanalysis. When used in combination with other equations, this should allow some algebraic attacks to be faster, at least in theory.
 

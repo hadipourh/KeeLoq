@@ -12,7 +12,9 @@ For each pair $(S,C)$, test $C[0..15]=S[16..31]$. For a survivor, the feedback b
 
 Group survivors by their peeled value $k_{16}$. For the true low key,
 
-$$\mathcal G_{k_{16}^*}=\{S:E_{16}(k_{16}^*,S)=E_{528}(K,S)\}=\{S:F^8(S)=S\}.$$
+```math
+\mathcal G_{k_{16}^*}=\{S:E_{16}(k_{16}^*,S)=E_{528}(K,S)\}=\{S:F^8(S)=S\}.
+```
 
 Invertibility of $E_{16}$ gives the equality. The true group contains exactly the true fixed points, with no extra noise votes. Wrong bins may still receive more votes, so ranking guides search order rather than deciding recovery.
 
@@ -20,17 +22,23 @@ Invertibility of $E_{16}$ gives the equality. The true group contains exactly th
 
 A state is fixed by $F^8$ exactly when its $F$-cycle length divides 8. For a large uniform random permutation, the small-cycle counts are approximately independent:
 
-$$X_d\approx\operatorname{Poisson}(1/d),\qquad d\in\{1,2,4,8\}.$$
+```math
+X_d\approx\mathrm{Poisson}(1/d),\qquad d\in\{1,2,4,8\}.
+```
 
 The modeled fixed-point count is $m=X_1+2X_2+4X_4+8X_8$, with mean 4 and variance 15. These moments are also exact for a uniform permutation on $2^{32}$ elements; the independent Poisson description of the full distribution is an approximation.
 
 In that approximation,
 
-$$\Pr(m=0)\approx e^{-15/8},\qquad \Pr(m\geq1)\approx1-e^{-15/8}\approx84.7\%.$$
+```math
+\Pr(m=0)\approx e^{-15/8},\qquad \Pr(m\geq1)\approx1-e^{-15/8}\approx84.7\%.
+```
 
 Exactly one fixed point requires $X_1=1$ and $X_2=X_4=X_8=0$, so
 
-$$\Pr(m=1)\approx e^{-15/8}\approx15.3\%,\qquad \Pr(m\geq2)\approx1-2e^{-15/8}\approx69.3\%.$$
+```math
+\Pr(m=1)\approx e^{-15/8}\approx15.3\%,\qquad \Pr(m\geq2)\approx1-2e^{-15/8}\approx69.3\%.
+```
 
 These are heuristic predictions for KeeLoq, not proven probabilities over its keys.
 
@@ -38,13 +46,17 @@ These are heuristic predictions for KeeLoq, not proven probabilities over its ke
 
 For each survivor compute $M_{16}=E_{16}(k_{16},S)$. In the true group, $F$ permutes the group's states, giving
 
-$$E_{48}(k[16..63],M_{16,i})=F(S_i)=S_{\sigma(i)}.$$
+```math
+E_{48}(k[16..63],M_{16,i})=F(S_i)=S_{\sigma(i)}.
+```
 
 ### Sweep A: Groups with at Least Two Candidates
 
 For a group of size $n\geq2$, fix source indices 0 and 1 and try all $n^2$ target pairs $(b,d)$:
 
-$$E_{48}(k[16..63],M_{16,0})=S_b,\qquad E_{48}(k[16..63],M_{16,1})=S_d.$$
+```math
+E_{48}(k[16..63],M_{16,0})=S_b,\qquad E_{48}(k[16..63],M_{16,1})=S_d.
+```
 
 The correct successor pair is among these hypotheses for the true group. An idealized independent-constraint model predicts about $2^{48-64}=2^{-16}$ solutions for a wrong hypothesis. Most wrong hypotheses are therefore expected to be UNSAT; this does **not** mean all are UNSAT or equally fast.
 

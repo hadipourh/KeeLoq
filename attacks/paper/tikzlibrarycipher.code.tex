@@ -1,0 +1,570 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% TIKZLIBRARY CIPHER %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   Utilities for drawing cryptographic circuits                               %
+%   Version: 2024-04-24                                                        %
+%   Author: Maria Eichlseder                                                   %
+%   \usetikzlibrary{cipher}                                                    %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\makeatletter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% SHAPES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% UTILS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% from https://tex.stackexchange.com/questions/14769/add-more-anchors-to-standard-tikz-nodes
+\newcommand{\anchorlet}[2]{%
+  \global\expandafter
+  \let\csname pgf@anchor@\pgf@sm@shape@name @#1\expandafter\endcsname
+  \csname pgf@anchor@\pgf@sm@shape@name @#2\endcsname
+}
+
+%%% OPERATION SHAPES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pgfdeclareshape{oplus}{%{{{
+  \inheritsavedanchors[from=circle]
+  \inheritanchorborder[from=circle]
+  \foreach \s in {center,mid,base,text, north,south,west,east,
+                  mid west,mid east,base west,base east,
+                  north west,south west,north east,south east} {
+    \inheritanchor[from=circle]{\s}
+  }
+  %\inheritbackgroundpath[from=circle]
+  % From /usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex:1148
+  \backgroundpath{%
+    \pgfutil@tempdima=\radius%
+    \pgfmathsetlength{\pgf@xb}{\pgfkeysvalueof{/pgf/outer xsep}}%
+    \pgfmathsetlength{\pgf@yb}{\pgfkeysvalueof{/pgf/outer ysep}}%
+    \ifdim\pgf@xb<\pgf@yb%
+      \advance\pgfutil@tempdima by-\pgf@yb%
+    \else%
+      \advance\pgfutil@tempdima by-\pgf@xb%
+    \fi%
+    \pgfpathcircle{\centerpoint}{\pgfutil@tempdima}%
+    % north-south
+    \centerpoint\advance\pgf@y by\radius  \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \centerpoint\advance\pgf@y by-\radius \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+    % east-west
+    \centerpoint\advance\pgf@x by\radius  \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \centerpoint\advance\pgf@x by-\radius \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+  }
+}%}}}
+
+\pgfdeclareshape{ominus}{%{{{
+  \inheritsavedanchors[from=circle]
+  \inheritanchorborder[from=circle]
+  \foreach \s in {center,mid,base,text, north,south,west,east,
+                  mid west,mid east,base west,base east,
+                  north west,south west,north east,south east} {
+    \inheritanchor[from=circle]{\s}
+  }
+  %\inheritbackgroundpath[from=circle]
+  % From /usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex:1148
+  \backgroundpath{%
+    \pgfutil@tempdima=\radius%
+    \pgfmathsetlength{\pgf@xb}{\pgfkeysvalueof{/pgf/outer xsep}}%
+    \pgfmathsetlength{\pgf@yb}{\pgfkeysvalueof{/pgf/outer ysep}}%
+    \ifdim\pgf@xb<\pgf@yb%
+      \advance\pgfutil@tempdima by-\pgf@yb%
+    \else%
+      \advance\pgfutil@tempdima by-\pgf@xb%
+    \fi%
+    \pgfpathcircle{\centerpoint}{\pgfutil@tempdima}%
+    % east-west
+    \centerpoint\advance\pgf@x by\radius  \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \centerpoint\advance\pgf@x by-\radius \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+  }
+}%}}}
+
+\pgfdeclareshape{otimes}{%{{{
+  \inheritsavedanchors[from=circle]
+  \inheritanchorborder[from=circle]
+  \foreach \s in {center,mid,base,text, north,south,west,east,
+                  mid west,mid east,base west,base east,
+                  north west,south west,north east,south east} {
+    \inheritanchor[from=circle]{\s}
+  }
+  %\inheritbackgroundpath[from=circle]
+  % From /usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex:1148
+  \backgroundpath{%
+    \pgfutil@tempdima=\radius%
+    \pgfmathsetlength{\pgf@xb}{\pgfkeysvalueof{/pgf/outer xsep}}%
+    \pgfmathsetlength{\pgf@yb}{\pgfkeysvalueof{/pgf/outer ysep}}%
+    \ifdim\pgf@xb<\pgf@yb%
+      \advance\pgfutil@tempdima by-\pgf@yb%
+    \else%
+      \advance\pgfutil@tempdima by-\pgf@xb%
+    \fi%
+    \pgfpathcircle{\centerpoint}{\pgfutil@tempdima}%
+    % nw-se
+    \centerpoint
+    \pgf@xc=\radius
+    \advance\pgf@x by-0.707107\pgf@xc  \pgf@xa=\pgf@x
+    \advance\pgf@y by 0.707107\pgf@xc  \pgf@ya=\pgf@y
+    \centerpoint
+    \advance\pgf@x by 0.707107\pgf@xc  \pgf@xb=\pgf@x
+    \advance\pgf@y by-0.707107\pgf@xc  \pgf@yb=\pgf@y
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+    % sw-ne
+    \centerpoint
+    \advance\pgf@x by-0.707107\pgf@xc  \pgf@xa=\pgf@x
+    \advance\pgf@y by-0.707107\pgf@xc  \pgf@ya=\pgf@y
+    \centerpoint
+    \advance\pgf@x by 0.707107\pgf@xc  \pgf@xb=\pgf@x
+    \advance\pgf@y by 0.707107\pgf@xc  \pgf@yb=\pgf@y
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+  }
+}%}}}
+
+\pgfdeclareshape{boxplus}{%{{{
+  \inheritsavedanchors[from=rectangle]
+  \inheritanchorborder[from=rectangle]
+  \foreach \s in {center,mid,base,text, north,south,west,east,
+                  mid west,mid east,base west,base east,
+                  north west,south west,north east,south east} {
+    \inheritanchor[from=rectangle]{\s}
+  }
+  \backgroundpath{
+    % store lower right in xa/ya and upper right in xb/yb
+    \southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \northeast \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    % store center in xc/yc
+    \pgf@xc=.5\pgf@xa \advance\pgf@xc by .5\pgf@xb
+    \pgf@yc=.5\pgf@ya \advance\pgf@yc by .5\pgf@yb
+    % construct main path
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xa}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}
+    \pgfpathclose
+    \pgfpathmoveto{\pgfpoint{\pgf@xc}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}
+  }
+}%}}}
+
+%%% PRIMITIVE SHAPES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pgfdeclareshape{compressionf}{%{{{
+  \inheritsavedanchors[from=rectangle]
+  \inheritanchorborder[from=rectangle]
+
+  \foreach \s in {center,base,text,
+                  north,south,west,east,
+                  north west, south west, north east, south east} {
+    \inheritanchor[from=rectangle]{\s}
+  }
+  \anchor{msg}{\southwest \pgf@xa=\pgf@x
+               \northeast \pgf@x=\pgf@xa}
+  \anchor{tip}{\southwest \pgf@xa=\pgf@x
+               \northeast
+               \pgf@x=\pgf@xa
+               \advance\pgf@y by \pgf@y}
+  \anchor{top}{\southwest \pgf@xa=\pgf@x
+               \northeast
+               \advance\pgf@x by-.5\pgf@x
+               \advance\pgf@x by .5\pgf@xa
+               \advance\pgf@y by .5\pgf@y}
+  \backgroundpath{
+    % store lower right in xa/ya and upper right in xb/yb
+    \southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \northeast \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    \pgf@xc=\pgf@xa
+    \pgf@yc=\pgf@yb \advance\pgf@yc by \pgf@yb
+
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xa}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}
+    \pgfpathclose
+  }
+}%}}}
+
+\pgfdeclareshape{compression}{%{{{
+  \inheritsavedanchors[from=rectangle]
+  \inheritanchorborder[from=rectangle]
+
+  \foreach \s in {center,base,text,
+    north,south,west,east,
+    north west, south west, north east, south east} {
+    \inheritanchor[from=rectangle]{\s}
+  }
+  \backgroundpath{
+    % store lower left in xa/ya and upper right in xb/yb
+    \southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \northeast \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    \pgf@xc=\pgf@xa \advance\pgf@xc by .75\pgf@xa
+    \pgf@yc=\pgf@xb \advance\pgf@yc by-.75\pgf@xa
+
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@yc}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}
+    \pgfpathclose
+  }
+}%}}}
+
+\pgfdeclareshape{filter}{%{{{
+  \inheritsavedanchors[from=rectangle]
+  \inheritanchorborder[from=rectangle]
+
+  \foreach \s in {center,base,text,
+                  north,south,west,east,
+                  north west, south west, north east, south east} {
+    \inheritanchor[from=rectangle]{\s}
+  }
+  \backgroundpath{
+    % store lower left in xa/ya and upper right in xb/yb
+    \southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \northeast \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    \pgf@xc=\pgf@xa \advance\pgf@xc by .75\pgf@xa
+    \pgf@yc=\pgf@xb \advance\pgf@yc by-.75\pgf@xa
+
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@yc}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}
+    \pgfpathclose
+  }
+}%}}}
+
+\pgfdeclareshape{authentication}{%{{{
+  \inheritsavedanchors[from=rectangle]
+  \inheritanchorborder[from=rectangle]
+
+  \foreach \s in {center,base,text,
+                  north,south,west,east,
+                  north west, south west, north east, south east} {
+    \inheritanchor[from=rectangle]{\s}
+  }
+  \anchor{tag}{\northeast \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               %\southwest \pgf@x=\pgf@xa}
+               \southwest \pgf@x=\pgf@xa \advance\pgf@y by .5\pgf@y \advance\pgf@y by -.5\pgf@ya}
+  \anchor{tip}{\northeast \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \southwest
+               \pgf@x=\pgf@xa
+               %\advance\pgf@y by \pgf@y}
+               \advance\pgf@y by \pgf@y \advance\pgf@y by -\pgf@ya}
+  \anchor{bot}{\northeast \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \southwest
+               \advance\pgf@x by-.5\pgf@x
+               \advance\pgf@x by .5\pgf@xa
+               %\advance\pgf@y by .5\pgf@y}
+               \advance\pgf@y by .5\pgf@y \advance\pgf@y by -.5\pgf@ya}
+  \backgroundpath{
+    % store upper right in xa/ya and lower left in xb/yb
+    \northeast \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \southwest \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    \pgf@xc=\pgf@xa
+    %\pgf@yc=\pgf@yb \advance\pgf@yc by \pgf@yb
+    \pgf@yc=\pgf@yb \advance\pgf@yc by \pgf@yb \advance\pgf@yc by -\pgf@ya
+
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xa}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}
+    \pgfpathclose
+  }
+}%}}}
+
+\pgfdeclareshape{wide}{%{{{
+  \inheritsavedanchors[from=rectangle]
+  \inheritanchorborder[from=rectangle]
+
+  \foreach \s in {center,base,text,
+                  north,south,west,east,
+                  north west, south west, north east, south east} {
+    \inheritanchor[from=rectangle]{\s}
+  }
+  \anchor{wnw}{\northeast \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \southwest \advance\pgf@y by-.75\pgf@y
+                          \advance\pgf@y by .75\pgf@ya}
+  \anchor{wsw}{\northeast \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \southwest \advance\pgf@y by-.25\pgf@y
+                          \advance\pgf@y by .25\pgf@ya}
+  \anchor{ene}{\southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \northeast \advance\pgf@y by-.25\pgf@y
+                          \advance\pgf@y by .25\pgf@ya}
+  \anchor{ese}{\southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \northeast \advance\pgf@y by-.75\pgf@y
+                          \advance\pgf@y by .75\pgf@ya}
+
+  \anchor{nnw}{\southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \northeast \advance\pgf@x by-.75\pgf@x
+                          \advance\pgf@x by .75\pgf@xa}
+  \anchor{nne}{\southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \northeast \advance\pgf@x by-.25\pgf@x
+                          \advance\pgf@x by .25\pgf@xa}
+  \anchor{ssw}{\northeast \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \southwest \advance\pgf@x by-.25\pgf@x
+                          \advance\pgf@x by .25\pgf@xa}
+  \anchor{sse}{\northeast \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+               \southwest \advance\pgf@x by-.75\pgf@x
+                          \advance\pgf@x by .75\pgf@xa}
+
+  \inheritbackgroundpath[from=rectangle]
+
+  \anchorlet{xouter}{wnw}
+  \anchorlet{youter}{ene}
+  \anchorlet{xinner}{wsw}
+  \anchorlet{yinner}{ese}
+}%}}}
+
+% TODO keyed north/west/south/east
+
+%%% OTHER SHAPES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\pgfdeclareshape{document}{%{{{
+  % paper with folded corner
+  % from PGF manual, "Command for Declare New Shapes"
+  \inheritsavedanchors[from=rectangle]
+  \inheritanchorborder[from=rectangle]
+  %\inheritanchor[from=rectangle]{center}
+  %\inheritanchor[from=rectangle]{north}
+  %\inheritanchor[from=rectangle]{south}
+  %\inheritanchor[from=rectangle]{west}
+  %\inheritanchor[from=rectangle]{east}
+  \foreach \s in {center,mid,base,text,north,south,west,east,
+                  mid west,mid east,base west,base east,
+                  north west,south west,north east,south east} {
+    \inheritanchor[from=rectangle]{\s}
+  }
+  \backgroundpath{
+    % store lower right in xa/ya and upper right in xb/yb
+    \southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \northeast \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    % compute corner of ‘‘flipped page’’
+    \pgf@xc=\pgf@xb \advance\pgf@xc by-5pt % this should be a parameter
+    \pgf@yc=\pgf@yb \advance\pgf@yc by-5pt
+    % construct main path
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xa}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}
+    \pgfpathclose
+    % add little corner
+    \pgfpathmoveto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}
+  }
+}
+\pgfdeclareshape{minidocument}{
+  % paper with folded corner
+  % from PGF manual, "Command for Declare New Shapes"
+  \inheritsavedanchors[from=rectangle]
+  \inheritanchorborder[from=rectangle]
+  \inheritanchor[from=rectangle]{center}
+  \inheritanchor[from=rectangle]{north}
+  \inheritanchor[from=rectangle]{south}
+  \inheritanchor[from=rectangle]{west}
+  \inheritanchor[from=rectangle]{east}
+  \backgroundpath{
+    % store lower right in xa/ya and upper right in xb/yb
+    \southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \northeast \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    % compute corner of ‘‘flipped page’’
+    \pgf@xc=\pgf@xb \advance\pgf@xc by-2pt % this should be a parameter
+    \pgf@yc=\pgf@yb \advance\pgf@yc by-2pt
+    % construct main path
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+    \pgfpathlineto{\pgfpoint{\pgf@xa}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}
+    \pgfpathclose
+    % add little corner
+    \pgfpathmoveto{\pgfpoint{\pgf@xc}{\pgf@yb}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}
+  }
+}
+\tikzset{doc/.style={draw, fill=none, shape=document}}
+\tikzset{minidoc/.style={draw, fill=none, shape=minidocument}}
+%}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% MATRIX STATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\providecommand{\State}[1]{\MatrixState{#1}}  % load library late to avoid name conflicts
+\newcommand{\MatrixState}[1]{%
+  \tikz[stateopts]{
+    \foreach \x/\y/\s in {0/0/0, 0/1/1, 0/2/2, 0/3/3,
+                          1/0/4, 1/1/5, 1/2/6, 1/3/7,
+                          2/0/8, 2/1/9, 2/2/10,2/3/11,
+                          3/0/12,3/1/13,3/2/14,3/3/15} {
+       %
+      \draw (\y+.5,-\x-.5) coordinate (s\s) coordinate (ss\x\y); % (rowwise indices)
+      \draw (\x+.5,-\y-.5) coordinate (b\s); % AES indices (columnwise)
+    }
+    \draw (2,-2) coordinate (label);
+    #1
+    \draw (0,0) rectangle (4,-4);
+    \foreach \x in {1,2,3} {
+      \draw[raster] (0,-\x) -- ++(4,0);
+      \draw[raster] (\x,0) -- ++(0,-4);
+    }
+  }%
+}
+\newcommand{\Column}[1]{%
+  \tikz[stateopts]{
+    \foreach \x/\y/\s in {0/0/0, 1/0/4, 2/0/8, 3/0/12} {
+      \draw (\y+.5,-\x-.5) coordinate (s\s) coordinate (ss\x\y); % (rowwise indices)
+    }
+    #1
+    \draw (0,0) rectangle (1,-4);
+    \foreach \x in {1,2,3} { \draw[raster] (0,-\x) -- ++(1,0); }
+  }%
+}
+
+\newcommand{\Cell}[2]{\draw (#1) node[inner sep=0pt,cellopts] {#2\vphantom{0}};}
+\newcommand{\FillCell}[2][fillopts]{\fill[#1] (#2) ++(-.5,.5) rectangle +(1,-1);}
+\newcommand{\FillCells}[2][fillopts]{\foreach \s in {#2} {\FillCell[#1]{ss\s}}}
+\newcommand{\Fill}[2][fillopts]{\FillCell[#1]{#2}}
+\newcommand{\FillColumn}[2][fillopts]{\fill[#1] (ss0#2) ++(-.5,.5) rectangle +(1,-4);}
+\newcommand{\FillDiagonal}[2][fillopts]{\foreach \dd in {0,...,3} {\pgfmathsetmacro{\dx}{mod(int(\dd)+int(#2),4)}\Fill[#1]{ss\dd\dx}}}
+\newcommand{\FillAntiDiagonal}[2][fillopts]{\foreach \dd in {0,...,3} {\pgfmathsetmacro{\dx}{mod(int(#2)+4-int(\dd),4)}\Fill[#1]{ss\dd\dx}}}
+\newcommand{\FillState}[1][fillopts]{\fill[#1] (0,0) rectangle (4,-4);}
+
+\newcommand{\TFill}[2][tfillopts]{\fill[#1] (#2) ++(-.5,.5) -- +(0,-1) -- +(1,0) -- cycle;}
+\newcommand{\BFill}[2][bfillopts]{\fill[#1] (#2) ++(.5,-.5) -- +(0,1) -- +(-1,0) -- cycle;}
+\newcommand{\TFillCells}[2][tfillopts]{\foreach \s in {#2} {\TFill[#1]{ss\s}}}
+\newcommand{\BFillCells}[2][bfillopts]{\foreach \s in {#2} {\BFill[#1]{ss\s}}}
+
+% TODO check out if TiKZ matrices (tikzmanual.pdf Chapter 20) could be useful instead
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% ARROWS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usetikzlibrary{arrows.meta}
+\pgfarrowsdeclare{ipe arrow}{ipe arrow}{%{{{
+  \pgfutil@tempdima=5pt\relax
+  \advance\pgfutil@tempdima-1.5\pgflinewidth
+  \pgfarrowsleftextend{+-\pgfutil@tempdima}%
+  \pgfarrowsrightextend{+1.5\pgflinewidth}%
+}{%
+  \pgftransformshift{\pgfqpoint{1.5\pgflinewidth}{0pt}}%
+  \pgfpathmoveto{\pgfpointorigin}%
+  \pgfpathlineto{\pgfqpoint{-5pt}{-1.666pt}}%
+  \pgfpathlineto{\pgfqpoint{-5pt}{+1.666pt}}%
+  \pgfpathclose
+  \pgfusepathqfill
+}%}}}
+\makeatother
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% STYLES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% OPERATION STYLES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\tikzset{op/.style={draw, fill=none, minimum size=1.5ex, inner sep=0pt}}
+\tikzset{xor/.style={op, shape=oplus}}
+\tikzset{not/.style={op, shape=ominus}}
+\tikzset{mul/.style={op, shape=otimes}}
+\tikzset{and/.style={op, shape=otimes}} % TODO \odot
+\tikzset{sum/.style={op, shape=boxplus}}
+\tikzset{tee/.style={shape=circle, fill, draw, inner sep=0pt, minimum size=2pt}}
+\tikzset{rot/.style={shape=rectangle, draw, inner sep=2pt, rounded corners=2pt}} % TODO
+
+%%% PRIMITIVE STYLES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\tikzset{box/.style={minimum size=.75cm, draw, inner sep=1pt, fill=white, rounded corners=3pt}}
+\tikzset{oper/.style={box,inner sep=1pt,minimum width=.3cm,font=\scriptsize,align=center}}
+
+\tikzset{
+  key west/.style={path picture={\draw[line cap=round,rounded corners=0pt] (path picture bounding box.west) +(.25pt,.65ex) -- +(.65ex,0) -- +(.25pt,-.65ex);}},
+  key east/.style={path picture={\draw[line cap=round,rounded corners=0pt] (path picture bounding box.east) +(-.25pt,.65ex) -- +(-.65ex,0) -- +(-.25pt,-.65ex);}},
+  key north/.style={path picture={\draw[line cap=round,rounded corners=0pt] (path picture bounding box.north) +(-.65ex,-.25pt) -- +(0,-.65ex) -- +(.65ex,-.25pt);}},
+  key south/.style={path picture={\draw[line cap=round,rounded corners=0pt] (path picture bounding box.south) +(-.65ex,.25pt) -- +(0,.65ex) -- +(.65ex,.25pt);}},
+  key at/.style args = {#1}{path picture={\draw[line cap=round,rounded corners=0pt] (path picture bounding box.#1) +(-.65ex,.25pt) -- +(0,.65ex) -- +(.65ex,.25pt);}},
+}
+
+%%% ARROW STYLES %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\tikzset{next/.style={->, >=ipe arrow}}
+\tikzset{prev/.style={<-, >=ipe arrow}}
+
+%%% MATRIX STATE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\tikzset{
+  state/.style={inner sep=0pt},
+  stateopts/.style={scale=.3},
+  raster/.style={},
+  fillopts/.style={gray},
+  tfillopts/.style={gray},
+  bfillopts/.style={gray},
+  cellopts/.style={},
+}
+
+% TODO provide settings that prefill nodes with \State{}
+
+% TODO alternative shapes -- careful, they mess up with chained comments and relative coordinates!
+\tikzset{
+  notalt/.style={draw,circle,append after command={
+                 [shorten >=\pgflinewidth, shorten <=\pgflinewidth]
+                 (\tikzlastnode.east) edge (\tikzlastnode.west)
+                }},
+  xoralt/.style={draw,circle,append after command={
+                 [shorten >=\pgflinewidth, shorten <=\pgflinewidth]
+                 (\tikzlastnode.north) edge (\tikzlastnode.south)
+                 (\tikzlastnode.east) edge (\tikzlastnode.west)
+                }},
+  andalt/.style={op, shape=circle, every label/.style={}, label={center:\tikz{\filldraw circle (.75pt);}} },
+}
+
+\newcommand{\CipherInit}[2]{
+  % #1 = label
+  % #2 = state
+  \coordinate (init);
+  \draw (init) coordinate (here); % current x-coordinate of state
+  \draw (here)  node[state,label={#1}] (S) {\MatrixState{#2}};
+  \draw (S.east) coordinate (Shere);
+}
+
+\newcommand{\CipherStep}[3]{
+  % #1 = operation
+  % #2 = label
+  % #3 = state
+
+  \draw (Shere.east) coordinate (Sprev);
+  \draw (S) ++(1.8,0) node[state,label={#2}] (S) {\MatrixState{#3}};
+  \draw[->] (Sprev) -- node[oper,align=center] {#1} (S);
+  \draw (S.east) coordinate (Shere);
+}
+
+\newcommand{\CipherAddK}[4]{
+  % #1 = label
+  % #2 = state
+  % #3 = keylabel
+  % #4 = keystate
+
+  \draw (Shere.east) coordinate (Sprev);
+  \draw (S) ++(5*\stateScale,-\stateScale) node[state,label={#1}] (S) {\MatrixState{#2}};
+  \draw (S.north) -- ++(0,.5*\stateScale) coordinate[xor] (Txor);
+  \draw[->,rounded corners=1pt] (Sprev) -- +(.5*\stateScale,0) |- (Txor);
+
+  \draw (S) ++(5*\stateScale,+\stateScale) node[state,label={#3}] (S) {\MatrixState{#4}};
+  \draw[<-,rounded corners=1pt] (S.west) -- +(-.5*\stateScale,0) |- (Txor);
+  \draw (S.east) coordinate (Shere);
+}
+
+\newcommand{\CipherLine}[2]{
+  \draw (S.east) coordinate (Send) ++(\stateScale,-3.5*\stateScale) coordinate (Shookend);
+  \draw (init) +(0,-6*\stateScale) coordinate (init);
+  \draw (init)  node[state,label={#1}] (S) {\MatrixState{#2}};
+  \draw (S.west) +(-\stateScale,0) coordinate (Shookstart);
+  \draw[->,rounded corners=2pt] (Send) -| (Shookend) -| (Shookstart) -- (S.west);
+  \draw (S.east) coordinate (Shere);
+}
+
+\newcommand{\stateScale}{.3}
+
+% vim: foldmethod=marker
